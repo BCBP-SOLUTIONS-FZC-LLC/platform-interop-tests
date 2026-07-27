@@ -1,0 +1,41 @@
+{
+  "_comment": "Header validation/parsing test vectors for pair 2 (gincommon <-> fastapicommon). Both go-probe's header-check and python-probe's header-check run every raw value through their own language's validation functions (Go: internal/core/domain/validation.go's NormalizeHeaderValue/NormalizeRequestID/ParseRoles; Python: fastapicommon.auth.validation's normalize_header_value/normalize_request_id/parse_roles) and must agree on the result for every case. `null` in an expected identity/request-id value means 'treated as absent'. Control-character cases use JSON \\u-escapes, not literal bytes.",
+  "identity_header_cases": [
+    {"name": "valid_simple", "raw": "acme-corp", "expected": "acme-corp"},
+    {"name": "empty_string", "raw": "", "expected": null},
+    {"name": "whitespace_only", "raw": "   ", "expected": null},
+    {"name": "trimmed", "raw": "  acme-corp  ", "expected": "acme-corp"},
+    {"name": "control_char_rejected", "raw": "acme\u0001corp", "expected": null},
+    {"name": "del_char_rejected", "raw": "acme\u007fcorp", "expected": null},
+    {"name": "newline_rejected", "raw": "acme\ncorp", "expected": null},
+    {"name": "line_separator_u2028_rejected", "raw": "acme corp", "expected": null},
+    {"name": "paragraph_separator_u2029_rejected", "raw": "acme corp", "expected": null}
+  ],
+  "identity_header_length_cases": [
+    {"name": "exactly_256_bytes_valid", "length": 256, "valid": true},
+    {"name": "257_bytes_rejected", "length": 257, "valid": false}
+  ],
+  "request_id_cases": [
+    {"name": "valid_token", "raw": "req-123.abc_DEF", "expected": "req-123.abc_DEF"},
+    {"name": "empty_generates_new", "raw": "", "expected": null},
+    {"name": "space_rejected", "raw": "has space", "expected": null},
+    {"name": "slash_rejected", "raw": "has/slash", "expected": null},
+    {"name": "comma_rejected", "raw": "has,comma", "expected": null}
+  ],
+  "request_id_length_cases": [
+    {"name": "exactly_128_bytes_valid", "length": 128, "valid": true},
+    {"name": "129_bytes_rejected", "length": 129, "valid": false}
+  ],
+  "roles_cases": [
+    {"name": "simple_csv", "raw": "admin,operator", "expected": ["admin", "operator"]},
+    {"name": "trims_whitespace", "raw": "admin, operator , viewer", "expected": ["admin", "operator", "viewer"]},
+    {"name": "dedup_first_wins", "raw": "admin,operator,admin", "expected": ["admin", "operator"]},
+    {"name": "drops_invalid_tokens", "raw": "admin,has space,operator,has/slash", "expected": ["admin", "operator"]},
+    {"name": "drops_empty_tokens", "raw": "admin,,operator,", "expected": ["admin", "operator"]},
+    {"name": "empty_header", "raw": "", "expected": []}
+  ],
+  "roles_length_cases": [
+    {"name": "role_exactly_64_bytes_valid", "length": 64, "valid": true},
+    {"name": "role_65_bytes_dropped", "length": 65, "valid": false}
+  ]
+}

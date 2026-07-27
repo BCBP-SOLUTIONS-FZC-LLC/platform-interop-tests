@@ -1,0 +1,152 @@
+# Reusable workflow — called by each of the six libraries' own CI (see COMPATIBILITY.md for the
+# calling snippet) on every PR, plus a nightly schedule against every repo's default branch as a
+# safety net. Checks out all seven repos as siblings (see README.md for the exact layout) and
+# runs run_interop.sh. A caller in the middle of its own PR passes its own ref via the matching
+# `*_ref` input so the interop check runs against the PR's actual changes, not stale `main`.
+name: Interop
+
+"on":
+  workflow_call:
+    inputs:
+      platform_events_ref:
+        type: string
+        default: main
+      platform_gincommon_ref:
+        type: string
+        default: main
+      platform_pgcommon_ref:
+        type: string
+        default: main
+      platform_eventcommon_ref:
+        type: string
+        default: main
+      platform_fastapicommon_ref:
+        type: string
+        default: main
+      platform_pgcommon_py_ref:
+        type: string
+        default: main
+    secrets:
+      gh_private_token:
+        description: >-
+          A PAT (or org-wide equivalent) with Contents:Read on all six libraries. Already used
+          under the name GH_PRIVATE_TOKEN by the three Python repos' own CI for sibling
+          checkouts; the three Go repos currently only define GO_PRIVATE_TOKEN (used for a
+          different purpose — git-credential-helper auth for `go mod download`, not
+          actions/checkout). Confirm GH_PRIVATE_TOKEN is also available to the Go repos (as a
+          repo or org secret) before this workflow can succeed when called from them.
+        required: true
+  workflow_dispatch:
+    inputs:
+      platform_events_ref:
+        type: string
+        default: main
+      platform_gincommon_ref:
+        type: string
+        default: main
+      platform_pgcommon_ref:
+        type: string
+        default: main
+      platform_eventcommon_ref:
+        type: string
+        default: main
+      platform_fastapicommon_ref:
+        type: string
+        default: main
+      platform_pgcommon_py_ref:
+        type: string
+        default: main
+  schedule:
+    # Nightly safety net — catches drift introduced without a PR touching any of the six repos
+    # directly (e.g. a dependency bump) rather than relying solely on per-PR triggers.
+    - cron: "17 4 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  interop:
+    name: Cross-language compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout platform-interop-tests
+        uses: actions/checkout@v7
+        with:
+          path: platform-interop-tests
+          persist-credentials: false
+
+      - name: Checkout platform-events
+        uses: actions/checkout@v7
+        with:
+          repository: BCBP-SOLUTIONS-FZC-LLC/platform-events
+          ref: ${{ inputs.platform_events_ref || 'main' }}
+          token: ${{ secrets.gh_private_token }}
+          path: platform-events
+          persist-credentials: false
+
+      - name: Checkout platform-gincommon
+        uses: actions/checkout@v7
+        with:
+          repository: BCBP-SOLUTIONS-FZC-LLC/platform-gincommon
+          ref: ${{ inputs.platform_gincommon_ref || 'main' }}
+          token: ${{ secrets.gh_private_token }}
+          path: platform-gincommon
+          persist-credentials: false
+
+      - name: Checkout platform-pgcommon
+        uses: actions/checkout@v7
+        with:
+          repository: BCBP-SOLUTIONS-FZC-LLC/platform-pgcommon
+          ref: ${{ inputs.platform_pgcommon_ref || 'main' }}
+          token: ${{ secrets.gh_private_token }}
+          path: platform-pgcommon
+          persist-credentials: false
+
+      - name: Checkout platform-eventcommon
+        uses: actions/checkout@v7
+        with:
+          repository: BCBP-SOLUTIONS-FZC-LLC/platform-eventcommon
+          ref: ${{ inputs.platform_eventcommon_ref || 'main' }}
+          token: ${{ secrets.gh_private_token }}
+          path: python/platform-eventcommon
+          persist-credentials: false
+
+      - name: Checkout platform-fastapicommon
+        uses: actions/checkout@v7
+        with:
+          repository: BCBP-SOLUTIONS-FZC-LLC/platform-fastapicommon
+          ref: ${{ inputs.platform_fastapicommon_ref || 'main' }}
+          token: ${{ secrets.gh_private_token }}
+          path: python/platform-fastapicommon
+          persist-credentials: false
+
+      - name: Checkout platform-pgcommon-py
+        uses: actions/checkout@v7
+        with:
+          repository: BCBP-SOLUTIONS-FZC-LLC/platform-pgcommon-py
+          ref: ${{ inputs.platform_pgcommon_py_ref || 'main' }}
+          token: ${{ secrets.gh_private_token }}
+          path: python/platform-pgcommon-py
+          persist-credentials: false
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Run the interop harness
+        working-directory: platform-interop-tests
+        run: ./run_interop.sh
+
+      - name: Upload probe output on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: interop-probe-output
+          path: platform-interop-tests/.build/
+          if-no-files-found: ignore

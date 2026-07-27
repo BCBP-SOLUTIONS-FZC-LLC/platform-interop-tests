@@ -1,0 +1,102 @@
+{
+  "_comment": "Table-driven GUCSet.Validate() cases for pair 1 (pgcommon <-> pgcommon-py). Both go-probe's gucset-check and python-probe's gucset-check load this file, run every case through their own language's GUCSet.Validate(), and must agree on accept/reject and on which error fired for every case. expected_error values: null (valid), \"inconsistent\" (ErrInconsistentGUCSet/InconsistentGUCSetError), \"empty_role\" (ErrEmptyTenantRole/EmptyTenantRoleError), \"invalid_role\" (ErrInvalidTenantRole/InvalidTenantRoleError).",
+  "cases": [
+    {
+      "name": "all_empty_is_valid",
+      "user_id": "",
+      "tenant_id": "",
+      "tenant_roles": [],
+      "expected_valid": true,
+      "expected_error": null
+    },
+    {
+      "name": "user_and_tenant_set_no_roles",
+      "user_id": "u-123",
+      "tenant_id": "acme",
+      "tenant_roles": [],
+      "expected_valid": true,
+      "expected_error": null
+    },
+    {
+      "name": "user_and_tenant_set_with_valid_roles",
+      "user_id": "u-123",
+      "tenant_id": "acme",
+      "tenant_roles": ["admin", "operator"],
+      "expected_valid": true,
+      "expected_error": null
+    },
+    {
+      "name": "tenant_only_no_user_is_valid",
+      "user_id": "",
+      "tenant_id": "acme",
+      "tenant_roles": [],
+      "expected_valid": true,
+      "expected_error": null,
+      "note": "Background jobs / system-scoped operations: tenant context without a specific user is allowed. Only user-without-tenant is rejected."
+    },
+    {
+      "name": "roles_with_underscores_and_dashes_are_valid",
+      "user_id": "u-1",
+      "tenant_id": "acme",
+      "tenant_roles": ["billing_admin", "read-only", "role123"],
+      "expected_valid": true,
+      "expected_error": null
+    },
+    {
+      "name": "user_without_tenant_is_inconsistent",
+      "user_id": "u-123",
+      "tenant_id": "",
+      "tenant_roles": [],
+      "expected_valid": false,
+      "expected_error": "inconsistent"
+    },
+    {
+      "name": "user_without_tenant_with_roles_is_still_inconsistent",
+      "user_id": "u-123",
+      "tenant_id": "",
+      "tenant_roles": ["admin"],
+      "expected_valid": false,
+      "expected_error": "inconsistent"
+    },
+    {
+      "name": "empty_role_string_is_rejected",
+      "user_id": "u-1",
+      "tenant_id": "acme",
+      "tenant_roles": ["admin", ""],
+      "expected_valid": false,
+      "expected_error": "empty_role"
+    },
+    {
+      "name": "role_containing_comma_is_rejected",
+      "user_id": "u-1",
+      "tenant_id": "acme",
+      "tenant_roles": ["admin,operator"],
+      "expected_valid": false,
+      "expected_error": "invalid_role"
+    },
+    {
+      "name": "one_valid_one_comma_role_is_rejected",
+      "user_id": "u-1",
+      "tenant_id": "acme",
+      "tenant_roles": ["admin", "bad,role"],
+      "expected_valid": false,
+      "expected_error": "invalid_role"
+    },
+    {
+      "name": "single_character_roles_are_valid",
+      "user_id": "u-1",
+      "tenant_id": "acme",
+      "tenant_roles": ["a", "b"],
+      "expected_valid": true,
+      "expected_error": null
+    },
+    {
+      "name": "system_tenant_sentinel_is_a_plain_valid_tenant_id",
+      "user_id": "u-1",
+      "tenant_id": "system",
+      "tenant_roles": [],
+      "expected_valid": true,
+      "expected_error": null
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+.build/
+go-probe/go.sum
+go-probe/go-probe
+python-probe/.venv/
+python-probe/uv.lock
+**/__pycache__/
+*.log

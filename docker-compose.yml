@@ -1,0 +1,31 @@
+name: platform-interop-tests
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: interop
+    ports:
+      - "55432:5432"
+    volumes:
+      - ./docker/init-rls.sql:/docker-entrypoint-initdb.d/init-rls.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d interop"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  localstack:
+    image: localstack/localstack:3
+    environment:
+      SERVICES: sns,sqs
+      DEFAULT_REGION: us-east-1
+    ports:
+      - "54566:4566"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
