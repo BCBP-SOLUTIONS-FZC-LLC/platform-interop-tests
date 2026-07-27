@@ -72,6 +72,12 @@ jobs:
       - name: Checkout platform-interop-tests
         uses: actions/checkout@v7
         with:
+          # Explicit repository/ref: without these, actions/checkout inside a reusable
+          # workflow defaults to the CALLING workflow's github.repository/github.sha, not
+          # this repo's — silently checking out the caller's tree into platform-interop-tests/
+          # instead of this repo, which is why run_interop.sh "didn't exist" at runtime.
+          repository: BCBP-SOLUTIONS-FZC-LLC/platform-interop-tests
+          ref: main
           path: platform-interop-tests
           persist-credentials: false
 
