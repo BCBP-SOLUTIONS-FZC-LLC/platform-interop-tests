@@ -38,7 +38,7 @@ def run(args: list[str]) -> int:
                 "user_agent": env.user_agent,
                 "dataschema": env.schema_id,
                 "time": wire_time,
-                "data": env.payload,
+                "data": env.data,
             },
             "round_trip_matches_input": round_tripped.strip() == data.strip(),
         }

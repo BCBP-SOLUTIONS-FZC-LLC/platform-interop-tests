@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import sys
 
-from eventcommon import parse_envelope, sign_envelope, verify_envelope
+from eventcommon import parse_envelope
+from eventcommon.hmac import sign_envelope, verify_envelope
 
 from probe.util import print_json
 
@@ -21,7 +22,7 @@ def run_check(args: list[str]) -> int:
     vector = _load_vector(args[0])
     key = bytes.fromhex(vector["key_hex"])  # type: ignore[arg-type]
     envelope_json = json.dumps(vector["envelope_json"]).encode("utf-8")
-    env = parse_envelope(envelope_json, payload_type=bytes)
+    env = parse_envelope(envelope_json, payload_type=dict)
 
     python_sig = sign_envelope(key, env)
     reproduces = python_sig == vector["signature_hex"]
@@ -51,7 +52,7 @@ def run_sign(args: list[str]) -> int:
     key = bytes.fromhex(key_hex)
     with open(envelope_path, "rb") as f:
         envelope_json = f.read()
-    env = parse_envelope(envelope_json, payload_type=bytes)
+    env = parse_envelope(envelope_json, payload_type=dict)
     sig = sign_envelope(key, env)
 
     print_json({"key_hex": key_hex, "envelope_json": json.loads(envelope_json), "signature_hex": sig})
