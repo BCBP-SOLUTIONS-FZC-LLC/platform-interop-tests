@@ -13,7 +13,7 @@ import (
 // COMPATIBILITY.md audit — see § events/eventcommon). Not derived dynamically: Go's
 // client_golang Gather() omits a CounterVec/GaugeVec/HistogramVec's metric family entirely
 // until at least one label combination has been observed (unlike Python's prometheus_client,
-// which lists family names up front) — populating every label combination for all 18 metrics
+// which lists family names up front) — populating every label combination for all 22 metrics
 // just to enumerate names dynamically would need per-metric label knowledge duplicated here
 // anyway, so the name list is simply hardcoded and cross-checked against a successful,
 // panic-free Init call instead.
@@ -37,6 +37,10 @@ var expectedMetricNames = []string{
 	"outbox_unmarshal_errors_total",
 	"outbox_mark_published_errors_total",
 	"events_oversized_event_type_label_total",
+	"events_codec_encode_total",
+	"events_codec_encode_duration_seconds",
+	"events_codec_decode_total",
+	"events_codec_decode_duration_seconds",
 }
 
 // runMetricsCheck registers events.InitWithRegisterer against a fresh registry (proving the
