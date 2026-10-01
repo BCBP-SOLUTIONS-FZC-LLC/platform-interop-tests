@@ -140,7 +140,10 @@ sys.exit(0 if r['all_match'] else 1)
 # --- pair 2: live cross-service HTTP check ---
 echo
 echo "== pair 2: live cross-service HTTP check (gincommon server <-> fastapicommon server) =="
-"$GO_PROBE_BIN" http-serve --port 18081 --peer http://localhost:18082 > "$ROOT/.build/go_server.log" 2>&1 &
+# gincommon v1.4.0 requires an observability identity at startup (domain +
+# registry environment); v1.3 ignores these, so the probe runs against both.
+OBSERVABILITY_DOMAIN=iam ENVIRONMENT=test \
+  "$GO_PROBE_BIN" http-serve --port 18081 --peer http://localhost:18082 > "$ROOT/.build/go_server.log" 2>&1 &
 GO_SERVER_PID=$!
 (cd "$PY_PROBE_DIR" && uv run python -m probe http-serve --port 18082 --peer http://localhost:18081) > "$ROOT/.build/py_server.log" 2>&1 &
 PY_SERVER_PID=$!

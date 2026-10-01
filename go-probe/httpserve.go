@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/BCBP-SOLUTIONS-FZC-LLC/platform-gincommon/pkg/gincommon"
 	"github.com/gin-gonic/gin"
@@ -64,6 +65,17 @@ func runHTTPServe(args []string) error {
 			return
 		}
 		gincommon.PropagateHeaders(c, req)
+		// The peer's /whoami is protected, so forward the verified identity too.
+		// gincommon v1.4.0 limits PropagateHeaders to trace context + request ID
+		// (identity moved to the opt-in PropagateIdentityHeaders); setting the
+		// headers from the RequestContext works against both v1.3 (main) and v1.4.
+		if rc, ok := gincommon.RequestContext(c); ok {
+			req.Header.Set("x-user-id", rc.UserID)
+			req.Header.Set("x-tenant-id", rc.TenantID)
+			if len(rc.Roles) > 0 {
+				req.Header.Set("x-tenant-roles", strings.Join(rc.Roles, ","))
+			}
+		}
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
