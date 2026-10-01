@@ -33,7 +33,31 @@ trap cleanup EXIT
 
 echo "== Building go-probe =="
 mkdir -p "$ROOT/.build"
-(cd "$GO_PROBE_DIR" && GOFLAGS=-mod=mod GOSUMDB=off GOTOOLCHAIN=local go build -o "$GO_PROBE_BIN" .) \
+# Build from a copy whose import paths and require/replace lines match the module path each
+# sibling checkout declares (e.g. .../platform-pgcommon/v2 from v2.0.0 on). The probe then builds
+# against any mix of major versions — one library's PR moving to /vN while the others' main is
+# still v1 — so a cross-repo major bump cannot deadlock this check. The copy's replace targets
+# are absolute (the copy sits at a different depth than go-probe/).
+GO_PROBE_SRC="$ROOT/.build/go-probe-src"
+rm -rf "$GO_PROBE_SRC" && mkdir -p "$GO_PROBE_SRC" && cp "$GO_PROBE_DIR"/*.go "$GO_PROBE_DIR"/go.mod "$GO_PROBE_SRC"/ \
+  || { echo "go-probe build failed: cannot copy sources"; exit 1; }
+for lib in platform-events platform-gincommon platform-pgcommon; do
+  base="github.com/BCBP-SOLUTIONS-FZC-LLC/$lib"
+  dir="$(cd "$ROOT/../$lib" 2>/dev/null && pwd)" \
+    || { echo "go-probe build failed: sibling checkout ../$lib not found"; exit 1; }
+  actual=$(awk '$1 == "module" { print $2; exit }' "$dir/go.mod")
+  case "$actual" in
+    "$base") ;;
+    "$base"/v[2-9]|"$base"/v[1-9][0-9])
+      echo "  $lib declares $actual"
+      major=${actual##*/v}
+      perl -pi -e 's#"\Q'"$base"'\E/#"'"$actual"'/#g' "$GO_PROBE_SRC"/*.go
+      perl -pi -e 's#^(\s+)\Q'"$base"'\E\s+v\S+#${1}'"$actual"' v'"$major"'.0.0#' "$GO_PROBE_SRC/go.mod" ;;
+    *) echo "go-probe build failed: ../$lib/go.mod declares '${actual}', want ${base}[/vN]"; exit 1 ;;
+  esac
+  perl -pi -e 's#^replace \Q'"$base"'\E => \S+#replace '"$actual"' => '"$dir"'#' "$GO_PROBE_SRC/go.mod"
+done
+(cd "$GO_PROBE_SRC" && GOFLAGS=-mod=mod GOSUMDB=off GOTOOLCHAIN=local go build -o "$GO_PROBE_BIN" .) \
   || { echo "go-probe build failed"; exit 1; }
 
 echo "== Syncing python-probe =="
