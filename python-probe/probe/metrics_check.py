@@ -8,20 +8,44 @@ from probe.util import print_json
 
 
 def run(args: list[str]) -> int:
-    registry = CollectorRegistry()
-    metrics_module.init_with_registry("interop-probe", "0.0.0-test", registry)
+    """Report eventcommon's Tier 1 (platform_*) metric contract.
 
-    # Unlike Go's client_golang, prometheus_client lists every registered family name up front —
-    # no need to force samples first (see go-probe/metrics.go's comment on this asymmetry). But
-    # prometheus_client strips the "_total" suffix from a Counter's *family* name (it's re-added
-    # on the actual exposed sample/metric name) while leaving Gauge/Histogram names alone — add
-    # it back so these are the literal names Go and a Prometheus scrape both actually use.
+    ``metric_names`` are the platform_* families eventcommon registers;
+    ``go_only`` are the Go Tier 1 metrics the Python port deliberately does not
+    emit (eventcommon.metrics_registry.GO_ONLY_METRICS: features the port
+    lacks). compare.py requires Go's set == metric_names | go_only.
+
+    A pre-standard eventcommon (no ``init_metrics``) has no Tier 1 metrics:
+    it reports an empty set, so the comparison fails with a clear message
+    instead of crashing.
+    """
+    registry = CollectorRegistry()
+    go_only: list[str] = []
+    if hasattr(metrics_module, "init_metrics"):
+        identity = metrics_module.MetricsIdentity(domain="iam", service="interop-probe", environment="test")
+        metrics_module.init_metrics(identity, registry)
+        from eventcommon import metrics_registry
+
+        go_only = sorted(getattr(metrics_registry, "GO_ONLY_METRICS", {}))
+
+    # prometheus_client strips "_total" from a Counter's family name (it is
+    # re-added on the exposed sample); add it back so these are the literal
+    # names a scrape and Go use.
     names = sorted(
         {
             mf.name if mf.type != "counter" or mf.name.endswith("_total") else f"{mf.name}_total"
             for mf in registry.collect()
+            if mf.name.startswith("platform_")
         }
     )
 
-    print_json({"language": "python", "check": "metrics-check", "metric_names": names})
+    print_json(
+        {
+            "language": "python",
+            "check": "metrics-check",
+            "metric_names": names,
+            "go_only": go_only,
+            "tier1_supported": hasattr(metrics_module, "init_metrics"),
+        }
+    )
     return 0

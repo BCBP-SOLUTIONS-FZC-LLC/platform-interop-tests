@@ -8,48 +8,31 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// expectedMetricNames is the literal set of Prometheus metric names platform-events registers
-// (verbatim from internal/adapter/outbound/metrics/metrics.go, cross-referenced during the
-// COMPATIBILITY.md audit — see § events/eventcommon). Not derived dynamically: Go's
-// client_golang Gather() omits a CounterVec/GaugeVec/HistogramVec's metric family entirely
-// until at least one label combination has been observed (unlike Python's prometheus_client,
-// which lists family names up front) — populating every label combination for all 22 metrics
-// just to enumerate names dynamically would need per-metric label knowledge duplicated here
-// anyway, so the name list is simply hardcoded and cross-checked against a successful,
-// panic-free Init call instead.
-var expectedMetricNames = []string{
-	"platform_events_build_info",
-	"events_published_total",
-	"events_publish_duration_seconds",
-	"events_consumed_total",
-	"events_consume_duration_seconds",
-	"outbox_pending_total",
-	"outbox_published_total",
-	"outbox_attempts_total",
-	"outbox_dead_letters_total",
-	"outbox_dead_letters_reprocessed_total",
-	"outbox_dead_letters_discarded_total",
-	"outbox_leased_total",
-	"sqs_receive_errors_total",
-	"sqs_delete_errors_total",
-	"sqs_visibility_extension_errors_total",
-	"outbox_poll_errors_total",
-	"outbox_unmarshal_errors_total",
-	"outbox_mark_published_errors_total",
-	"events_oversized_event_type_label_total",
-	"events_codec_encode_total",
-	"events_codec_encode_duration_seconds",
-	"events_codec_decode_total",
-	"events_codec_decode_duration_seconds",
-}
-
-// runMetricsCheck registers events.InitWithRegisterer against a fresh registry (proving the
-// hardcoded name list above doesn't collide/panic) and reports whichever families already have
-// at least one sample (build_info always does; the rest only would after a real publish/
-// consume/outbox call) as a secondary, best-effort dynamic cross-check.
+// runMetricsCheck reports platform-events' Tier 1 (platform_*) metric
+// contract: the names of every Tier 1 entry in the library's own registry
+// (events.MetricsRegistry). The pre-standard legacy names are not part of
+// the cross-language contract — they were removed from both libraries with no
+// compatibility period — so they are excluded on releases that still carry
+// them, which keeps this check valid against any platform-events with the
+// Observability Standard (v1.6.0+).
+//
+// InitMetrics against a fresh registry proves the set registers without
+// error; gathered_with_samples is a best-effort dynamic cross-check (Go's
+// client_golang only gathers a vector once a label combination exists).
 func runMetricsCheck(args []string) error {
 	reg := prometheus.NewRegistry()
-	events.InitWithRegisterer("interop-probe", "0.0.0-test", reg)
+	id := events.MetricsIdentity{Domain: "iam", Service: "interop-probe", Environment: "test"}
+	if _, err := events.InitMetrics(id, reg); err != nil {
+		return fmt.Errorf("InitMetrics: %w", err)
+	}
+
+	names := []string{}
+	for _, e := range events.MetricsRegistry() {
+		if string(e.Tier) == "platform" {
+			names = append(names, e.Name)
+		}
+	}
+	sort.Strings(names)
 
 	families, err := reg.Gather()
 	if err != nil {
@@ -60,9 +43,6 @@ func runMetricsCheck(args []string) error {
 		gathered = append(gathered, mf.GetName())
 	}
 	sort.Strings(gathered)
-
-	names := append([]string(nil), expectedMetricNames...)
-	sort.Strings(names)
 
 	return printJSON(map[string]any{
 		"language":              "go",

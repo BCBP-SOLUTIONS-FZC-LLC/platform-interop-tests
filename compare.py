@@ -48,10 +48,27 @@ def check_envelope(go_path: str, py_path: str) -> bool:
 
 
 def check_metrics(go_path: str, py_path: str) -> bool:
-    go = set(_load(go_path)["metric_names"])
-    py = set(_load(py_path)["metric_names"])
-    if go != py:
-        print(f"metrics mismatch: go_only={go - py} py_only={py - go}", file=sys.stderr)
+    """Tier 1 (platform_*) parity: Go's set must equal Python's plus the Go
+    metrics the Python port declares it does not emit (GO_ONLY_METRICS)."""
+    go_doc, py_doc = _load(go_path), _load(py_path)
+    go = set(go_doc["metric_names"])
+    py = set(py_doc["metric_names"])
+    go_only = set(py_doc.get("go_only", []))
+    if not py_doc.get("tier1_supported", True):
+        print("metrics mismatch: this eventcommon has no Tier 1 metrics (pre-standard); "
+              "it needs the Enterprise Platform Observability Standard port", file=sys.stderr)
+        return False
+    problems = []
+    if go_only & py:
+        problems.append(f"declared go_only but emitted by Python: {sorted(go_only & py)}")
+    if go_only - go:
+        problems.append(f"declared go_only but not in Go's registry: {sorted(go_only - go)}")
+    if py - go:
+        problems.append(f"py_only={sorted(py - go)}")
+    if go - py - go_only:
+        problems.append(f"go_only (undeclared)={sorted(go - py - go_only)}")
+    if problems:
+        print("metrics mismatch: " + "; ".join(problems), file=sys.stderr)
         return False
     return True
 
