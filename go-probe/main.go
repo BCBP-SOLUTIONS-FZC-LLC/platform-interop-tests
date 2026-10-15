@@ -11,7 +11,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: go-probe <gucset-check|hmac-check|hmac-verify|envelope-check|metrics-check|pg-rls-check|http-serve> [args...]")
+		fmt.Fprintln(os.Stderr, "usage: go-probe <gucset-check|hmac-check|hmac-verify|envelope-check|metrics-check|pg-rls-check|pg-migrate|pg-metrics-check|http-serve> [args...]")
 		os.Exit(2)
 	}
 
@@ -35,6 +35,10 @@ func main() {
 	// residual-risk note.
 	case "pg-rls-check":
 		err = runPGRLSCheck(os.Args[2:])
+	case "pg-migrate":
+		err = runPGMigrate(os.Args[2:])
+	case "pg-metrics-check":
+		err = runPGMetricsCheck(os.Args[2:])
 	case "http-serve":
 		err = runHTTPServe(os.Args[2:])
 	default:

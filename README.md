@@ -23,6 +23,8 @@ platform-interop-tests/
   docker/init-rls.sql      # schema + seed rows for pg-rls-check
   fixtures/
     gucset_cases.json      # pair 1 — GUCSet.Validate() table-driven cases
+    migrations/            # pair 1 — tiny up/down migrations (2 is slow: pg_sleep) for pg-migrate-check
+    migrations-failing/    # pair 1 — a migration that always fails, overlaid on migrations/ for the dirty-state round trip
     envelope_golden.json   # pair 3 — a real Go-emitted Envelope.JSON() capture
     hmac_vector.json        # pair 3 — a real Go-computed HMAC signature over the envelope above
     header_cases.json      # pair 2 — header validation/parsing test vectors
@@ -60,12 +62,30 @@ XPertSharedLib/
 Requires Go, `uv`, and Docker. Builds both probes, brings up Postgres + LocalStack, runs every
 check, prints a pass/fail table, tears down. Exits non-zero if anything fails.
 
+Host ports default to Postgres 55432, LocalStack 54566 and the two `http-serve` servers
+18081 (Go) / 18082 (Python). Override them where another stack already holds one, and give the
+compose project its own name to run beside another checkout:
+
+```bash
+COMPOSE_PROJECT_NAME=interop-mine INTEROP_POSTGRES_PORT=56432 INTEROP_LOCALSTACK_PORT=56566 \
+  INTEROP_GO_HTTP_PORT=18091 INTEROP_PY_HTTP_PORT=18092 ./run_interop.sh
+```
+
+`python-probe` resolves pgcommon-py and eventcommon in one environment, so eventcommon's own
+`pgcommon` requirement must admit the pgcommon-py checkout: pgcommon-py 0.3.x needs an
+eventcommon that allows `pgcommon<0.4` (eventcommon's main still pins `<0.3.0` until its
+pgcommon-0.3 compatibility change merges; `uv sync` fails before any check runs otherwise).
+pgcommon-py 0.3.0 itself requires `asyncpg>=0.30,<0.32`, mirrored by python-probe's floor.
+
 ## What each subcommand proves
 
 | Subcommand | Pair | What it proves |
 |---|---|---|
-| `gucset-check` | 1 | Both languages' `GUCSet.Validate()` agree on accept/reject for every case in `gucset_cases.json` |
+| `gucset-check` | 1 | Both languages' `GUCSet.Validate()` agree, for every case in `gucset_cases.json`, on accept/reject and on *which* error fired: user without tenant (`inconsistent`), tenant roles without tenant (`roles_without_tenant`), empty role, comma in a role (`invalid_role`), and a NUL in `user_id`/`tenant_id`/a role (`invalid_value`) — including each rule's precedence when several apply. Invalid values use NUL only: a lone surrogate or invalid UTF-8 decodes differently from JSON in Go and Python. python-probe maps every `pgcommon.IDENTITY_ERRORS` member and reports an unmapped one (or any unexpected exception) as `unknown:…` instead of crashing |
 | `pg-rls-check` | 1 | A Go connection and a Python connection, each scoped to the same `tenant_id` under the *same* real Postgres RLS policy, see the *same* row set — in both standard (session-scoped `is_local=false`) and PgBouncer-simulated (transaction-scoped `is_local=true`) modes |
+| `pg-migrate` | 1 | One `migrate.Runner` operation (`up`, `down N`, `steps N`, `version`, `force V`) in each language, reported as JSON — the building block `pg-migrate-check` drives |
+| `pg-migrate-check` | 1 | **python-probe only, an orchestrator** (it runs both languages' `pg-migrate` and pgcommon-py's `pgcommon-migrate status` CLI as subprocesses, one fresh database per scenario, watching `pg_locks`/`pg_stat_activity` as the superuser); `compare.py migrate` holds the expectations. **roundtrip:** on one database and tracking table, Go applies 1–2 and Python's `version()`/CLI `status` read 2; Python applies 3 and Go reads 3; Python rolls back one and Go reads 2; a deliberately failing migration run by Go leaves the schema dirty at 4 for both, Python refuses (`dirty`) and recovers with `force 3`, then the same with the roles swapped; Go rolls everything back and Python reads "no version". **lock_keys:** for URL, `postgresql://`, keyword/value (plain, spaced and quoted, `PGDATABASE`-only), a percent-encoded path, a URL without a path (database from `?dbname=` or `PGDATABASE`), a custom table (Runner option, `x-migrations-table`, quoted `"schema"."table"`), the advisory-lock key each runner actually holds while migrating equals the other's and golang-migrate's key recomputed from (database name, schema, table). **serialisation:** a Go and a Python runner started together on one table (each language leading once) — the follower blocks on the leader's key, every migration is applied exactly once (each migration records who applied it), the final version is 3, clean. Go's runner takes the lock per migration and Python's for the whole run (pgcommon-py ARCHITECTURE.md § Divergences from Go), so a waiting Python runner applies the migrations a Go leader has not started yet; this is declared as `GO_LOCKS_PER_MIGRATION` in `compare.py`, and the check fails if it stops being true |
+| `pg-metrics-check` | 1 | Tier 1 `platform_db_*` parity. Each probe calls `InitWithIdentity` / `init_with_identity` on a fresh registry, opens a real pool and runs one query (so every family is gatherable), then reports its registry (`pgmetrics.Registry()` / `pgcommon.metrics_registry.registry()`: name, type, tier, status, help, required/approved labels, allowed label values) and the registered families (type, help, label names in declared order — identity labels first; Go's const/variable split is not part of the contract — histogram buckets, and the values of `state`/`outcome`/`reason`). Everything must be equal except the Go label values pgcommon-py declares it cannot emit (`SKIPPED_IN_PYTHON`, e.g. `platform_db_pool_connections{state="constructing"}`); a declaration this check can observe must hold |
 | `envelope-check` | 3 | Both languages parse a real Go-emitted envelope identically, field-for-field |
 | `hmac-check` | 3 | Both languages reproduce and verify a real Go-computed HMAC signature over the same envelope |
 | `hmac-sign` / `hmac-verify` | 3 | The *reverse* direction: python-probe signs, go-probe verifies — proving the check isn't one-directional |

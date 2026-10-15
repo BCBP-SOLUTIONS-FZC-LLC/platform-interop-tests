@@ -15,6 +15,12 @@ COMPOSE_STARTED=0
 GO_SERVER_PID=""
 PY_SERVER_PID=""
 
+# Host ports are overridable, for a machine where another stack already holds a default.
+PG_PORT="${INTEROP_POSTGRES_PORT:-55432}"
+export INTEROP_POSTGRES_PORT="$PG_PORT" INTEROP_LOCALSTACK_PORT="${INTEROP_LOCALSTACK_PORT:-54566}"
+GO_HTTP_PORT="${INTEROP_GO_HTTP_PORT:-18081}"
+PY_HTTP_PORT="${INTEROP_PY_HTTP_PORT:-18082}"
+
 PASS=0
 FAIL=0
 declare -a FAILURES=()
@@ -75,7 +81,7 @@ for _ in $(seq 1 60); do
 done
 echo " ready"
 
-DSN="postgres://interop_app:interop_app@localhost:55432/interop"
+DSN="postgres://interop_app:interop_app@localhost:${PG_PORT}/interop"
 
 # --- pair 1: gucset-check ---
 echo
@@ -106,6 +112,39 @@ for mode in standard pgbouncer; do
       || fail "pg-rls-check mode=$mode tenant=$tenant: row sets differ"
   done
 done
+
+# --- pair 1: pg-migrate-check (Go and Python migration runners on shared databases) ---
+# python-probe's pg-migrate-check orchestrates: it runs go-probe's and its own pg-migrate (one
+# Runner operation each) and pgcommon-py's `pgcommon-migrate status` CLI against one fresh
+# database per scenario, as the postgres superuser watches pg_locks / pg_stat_activity, and
+# reports raw observations. compare.py holds the expectations, one pass/fail per scenario.
+echo
+echo "== pair 1: pg-migrate-check =="
+"${PY_RUN[@]}" pg-migrate-check --go-probe "$GO_PROBE_BIN" --pg-port "$PG_PORT" \
+  --migrations "$FIXTURES/migrations" --failing-dir "$FIXTURES/migrations-failing" --work-dir "$ROOT/.build" \
+  > "$ROOT/.build/pg_migrate.json" 2>"$ROOT/.build/pg_migrate.err" \
+  && pass "pg-migrate-check orchestrator ran" \
+  || fail "pg-migrate-check orchestrator crashed: $(tail -20 "$ROOT/.build/pg_migrate.err")"
+python3 "$ROOT/compare.py" migrate "$ROOT/.build/pg_migrate.json" roundtrip \
+  && pass "pg-migrate-check roundtrip: each runner reads, refuses (dirty) and force-recovers what the other wrote" \
+  || fail "pg-migrate-check roundtrip: Go/Python runners disagree on shared migration state"
+python3 "$ROOT/compare.py" migrate "$ROOT/.build/pg_migrate.json" lock_keys \
+  && pass "pg-migrate-check lock_keys: Go and Python hold the same advisory-lock key for every DSN/table variant" \
+  || fail "pg-migrate-check lock_keys: Go and Python lock different keys"
+python3 "$ROOT/compare.py" migrate "$ROOT/.build/pg_migrate.json" serialisation \
+  && pass "pg-migrate-check serialisation: concurrent Go/Python runners serialise, every migration applied once" \
+  || fail "pg-migrate-check serialisation: concurrent Go/Python runners did not serialise"
+
+# --- pair 1: pg-metrics-check (Tier 1 platform_db_* registry + registered families) ---
+echo
+echo "== pair 1: pg-metrics-check =="
+"$GO_PROBE_BIN" pg-metrics-check --dsn "$DSN" > "$ROOT/.build/go_pgmetrics.json" 2>"$ROOT/.build/go_pgmetrics.err" \
+  && pass "go-probe pg-metrics-check ran" || fail "go-probe pg-metrics-check crashed: $(cat "$ROOT/.build/go_pgmetrics.err")"
+"${PY_RUN[@]}" pg-metrics-check --dsn "$DSN" > "$ROOT/.build/py_pgmetrics.json" 2>"$ROOT/.build/py_pgmetrics.err" \
+  && pass "python-probe pg-metrics-check ran" || fail "python-probe pg-metrics-check crashed: $(cat "$ROOT/.build/py_pgmetrics.err")"
+python3 "$ROOT/compare.py" pgmetrics "$ROOT/.build/go_pgmetrics.json" "$ROOT/.build/py_pgmetrics.json" \
+  && pass "pg-metrics-check: identical platform_db_* registry and registered families (names, types, help, labels, buckets)" \
+  || fail "pg-metrics-check: platform_db_* metric contracts differ"
 
 # --- pair 3: envelope-check, hmac-check, hmac bidirectional, metrics-check ---
 echo
@@ -167,37 +206,37 @@ echo "== pair 2: live cross-service HTTP check (gincommon server <-> fastapicomm
 # gincommon v1.4.0 requires an observability identity at startup (domain +
 # registry environment); v1.3 ignores these, so the probe runs against both.
 OBSERVABILITY_DOMAIN=iam ENVIRONMENT=test \
-  "$GO_PROBE_BIN" http-serve --port 18081 --peer http://localhost:18082 > "$ROOT/.build/go_server.log" 2>&1 &
+  "$GO_PROBE_BIN" http-serve --port "$GO_HTTP_PORT" --peer "http://localhost:$PY_HTTP_PORT" > "$ROOT/.build/go_server.log" 2>&1 &
 GO_SERVER_PID=$!
-(cd "$PY_PROBE_DIR" && uv run python -m probe http-serve --port 18082 --peer http://localhost:18081) > "$ROOT/.build/py_server.log" 2>&1 &
+(cd "$PY_PROBE_DIR" && uv run python -m probe http-serve --port "$PY_HTTP_PORT" --peer "http://localhost:$GO_HTTP_PORT") > "$ROOT/.build/py_server.log" 2>&1 &
 PY_SERVER_PID=$!
 
 echo -n "waiting for both servers..."
 for _ in $(seq 1 30); do
-  curl -sf http://localhost:18081/health >/dev/null 2>&1 && curl -sf http://localhost:18082/health >/dev/null 2>&1 && break
+  curl -sf "http://localhost:${GO_HTTP_PORT}/health" >/dev/null 2>&1 && curl -sf "http://localhost:${PY_HTTP_PORT}/health" >/dev/null 2>&1 && break
   echo -n "."
   sleep 1
 done
 echo " ready"
 
-curl -sf http://localhost:18081/health >/dev/null 2>&1 && pass "go-probe http-serve /health" || fail "go-probe http-serve /health unreachable"
-curl -sf http://localhost:18082/health >/dev/null 2>&1 && pass "python-probe http-serve /health" || fail "python-probe http-serve /health unreachable"
+curl -sf "http://localhost:${GO_HTTP_PORT}/health" >/dev/null 2>&1 && pass "go-probe http-serve /health" || fail "go-probe http-serve /health unreachable"
+curl -sf "http://localhost:${PY_HTTP_PORT}/health" >/dev/null 2>&1 && pass "python-probe http-serve /health" || fail "python-probe http-serve /health unreachable"
 
 HEADERS=(-H "x-user-id: u-1" -H "x-tenant-id: acme" -H "x-tenant-roles: admin,operator")
-curl -s "${HEADERS[@]}" http://localhost:18081/whoami > "$ROOT/.build/go_whoami.json" 2>&1
-curl -s "${HEADERS[@]}" http://localhost:18082/whoami > "$ROOT/.build/py_whoami.json" 2>&1
+curl -s "${HEADERS[@]}" "http://localhost:${GO_HTTP_PORT}/whoami" > "$ROOT/.build/go_whoami.json" 2>&1
+curl -s "${HEADERS[@]}" "http://localhost:${PY_HTTP_PORT}/whoami" > "$ROOT/.build/py_whoami.json" 2>&1
 python3 "$ROOT/compare.py" whoami "$ROOT/.build/go_whoami.json" "$ROOT/.build/py_whoami.json" \
   && pass "whoami: identical tenant_id/user_id/roles for the same headers on both servers" \
   || fail "whoami: RequestContext values differ between the two servers"
 
-GO_401=$(curl -s -o "$ROOT/.build/go_401.json" -w "%{http_code}" http://localhost:18081/whoami)
-PY_401=$(curl -s -o "$ROOT/.build/py_401.json" -w "%{http_code}" http://localhost:18082/whoami-protected)
+GO_401=$(curl -s -o "$ROOT/.build/go_401.json" -w "%{http_code}" "http://localhost:${GO_HTTP_PORT}/whoami")
+PY_401=$(curl -s -o "$ROOT/.build/py_401.json" -w "%{http_code}" "http://localhost:${PY_HTTP_PORT}/whoami-protected")
 python3 "$ROOT/compare.py" error_shape "$ROOT/.build/go_401.json" "$ROOT/.build/py_401.json" "$GO_401" "$PY_401" \
   && pass "error shape: both 401s share {error,status,trace_id,request_id} (status=$GO_401/$PY_401)" \
   || fail "error shape: 401 bodies diverge (status=$GO_401/$PY_401)"
 
-curl -s "${HEADERS[@]}" http://localhost:18081/call-other > "$ROOT/.build/go_call_other.json" 2>&1
-curl -s "${HEADERS[@]}" http://localhost:18082/call-other > "$ROOT/.build/py_call_other.json" 2>&1
+curl -s "${HEADERS[@]}" "http://localhost:${GO_HTTP_PORT}/call-other" > "$ROOT/.build/go_call_other.json" 2>&1
+curl -s "${HEADERS[@]}" "http://localhost:${PY_HTTP_PORT}/call-other" > "$ROOT/.build/py_call_other.json" 2>&1
 python3 "$ROOT/compare.py" trace_continuity "$ROOT/.build/go_call_other.json" "$ROOT/.build/py_call_other.json" \
   && pass "trace continuity: own_trace_id == peer's reported trace_id, both directions" \
   || fail "trace continuity: trace ID did not propagate correctly in one direction"

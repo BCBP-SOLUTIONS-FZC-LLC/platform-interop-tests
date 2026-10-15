@@ -29,7 +29,9 @@ type gucsetResult struct {
 	MatchesFixture bool    `json:"matches_fixture"`
 }
 
-// errorCode maps a validation error to the fixture's language-agnostic error code strings.
+// errorCode maps a validation error to the fixture's language-agnostic error code strings
+// (see the _comment in fixtures/gucset_cases.json). An error with no code is reported as
+// "unknown:<message>", which never matches a fixture case.
 func errorCode(err error) *string {
 	if err == nil {
 		return nil
@@ -38,10 +40,14 @@ func errorCode(err error) *string {
 	switch {
 	case errors.Is(err, domain.ErrInconsistentGUCSet):
 		code = "inconsistent"
+	case errors.Is(err, domain.ErrTenantRolesWithoutTenant):
+		code = "roles_without_tenant"
 	case errors.Is(err, domain.ErrEmptyTenantRole):
 		code = "empty_role"
 	case errors.Is(err, domain.ErrInvalidTenantRole):
 		code = "invalid_role"
+	case errors.Is(err, domain.ErrInvalidGUCValue):
+		code = "invalid_value"
 	default:
 		code = "unknown:" + err.Error()
 	}

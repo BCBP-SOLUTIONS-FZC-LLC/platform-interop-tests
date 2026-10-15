@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: interop
     ports:
-      - "55432:5432"
+      - "${INTEROP_POSTGRES_PORT:-55432}:5432"
     volumes:
       - ./docker/init-rls.sql:/docker-entrypoint-initdb.d/init-rls.sql:ro
     healthcheck:
@@ -23,7 +23,7 @@ services:
       SERVICES: sns,sqs
       DEFAULT_REGION: us-east-1
     ports:
-      - "54566:4566"
+      - "${INTEROP_LOCALSTACK_PORT:-54566}:4566"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
       interval: 2s
