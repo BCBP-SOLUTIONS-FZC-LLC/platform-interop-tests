@@ -1,5 +1,5 @@
 {
-  "_comment": "Table-driven GUCSet.Validate() cases for pair 1 (pgcommon <-> pgcommon-py). Both go-probe's gucset-check and python-probe's gucset-check load this file, run every case through their own language's GUCSet.Validate(), and must agree on accept/reject and on which error fired for every case. expected_error values: null (valid), \"inconsistent\" (ErrInconsistentGUCSet/InconsistentGUCSetError), \"empty_role\" (ErrEmptyTenantRole/EmptyTenantRoleError), \"invalid_role\" (ErrInvalidTenantRole/InvalidTenantRoleError).",
+  "_comment": "Table-driven GUCSet.Validate() cases for pair 1 (pgcommon <-> pgcommon-py). Both go-probe's gucset-check and python-probe's gucset-check load this file, run every case through their own language's GUCSet.Validate(), and must agree on accept/reject and on which error fired for every case. expected_error values: null (valid), \"inconsistent\" (ErrInconsistentGUCSet/InconsistentGUCSetError), \"roles_without_tenant\" (ErrTenantRolesWithoutTenant/TenantRolesWithoutTenantError), \"empty_role\" (ErrEmptyTenantRole/EmptyTenantRoleError), \"invalid_role\" (ErrInvalidTenantRole/InvalidTenantRoleError), \"invalid_value\" (ErrInvalidGUCValue/InvalidGUCValueError). Both libraries check in this order, first failure wins: user_id without tenant_id; tenant_roles without tenant_id; user_id/tenant_id value validity; then per role, in list order: empty, comma, value validity. Invalid values are spelled with a NUL (\\u0000) only: a lone surrogate or invalid UTF-8 decodes differently in Go (U+FFFD) and Python (a lone surrogate str), so it would not test the same input.",
   "cases": [
     {
       "name": "all_empty_is_valid",
@@ -56,7 +56,8 @@
       "tenant_id": "",
       "tenant_roles": ["admin"],
       "expected_valid": false,
-      "expected_error": "inconsistent"
+      "expected_error": "inconsistent",
+      "note": "Precedence: user-without-tenant is checked before roles-without-tenant, so this is inconsistent, not roles_without_tenant."
     },
     {
       "name": "empty_role_string_is_rejected",
@@ -97,6 +98,134 @@
       "tenant_roles": [],
       "expected_valid": true,
       "expected_error": null
+    },
+    {
+      "name": "roles_without_tenant_is_rejected",
+      "user_id": "",
+      "tenant_id": "",
+      "tenant_roles": ["admin"],
+      "expected_valid": false,
+      "expected_error": "roles_without_tenant",
+      "note": "Roles are only meaningful within a tenant scope."
+    },
+    {
+      "name": "several_roles_without_tenant_are_rejected",
+      "user_id": "",
+      "tenant_id": "",
+      "tenant_roles": ["admin", "operator"],
+      "expected_valid": false,
+      "expected_error": "roles_without_tenant"
+    },
+    {
+      "name": "roles_without_tenant_wins_over_empty_role",
+      "user_id": "",
+      "tenant_id": "",
+      "tenant_roles": [""],
+      "expected_valid": false,
+      "expected_error": "roles_without_tenant",
+      "note": "Precedence: the missing tenant is reported before any per-role check."
+    },
+    {
+      "name": "roles_without_tenant_wins_over_comma_role",
+      "user_id": "",
+      "tenant_id": "",
+      "tenant_roles": ["a,b"],
+      "expected_valid": false,
+      "expected_error": "roles_without_tenant"
+    },
+    {
+      "name": "roles_without_tenant_wins_over_nul_role",
+      "user_id": "",
+      "tenant_id": "",
+      "tenant_roles": ["ad\u0000min"],
+      "expected_valid": false,
+      "expected_error": "roles_without_tenant"
+    },
+    {
+      "name": "nul_in_user_id_is_invalid_value",
+      "user_id": "u\u00001",
+      "tenant_id": "acme",
+      "tenant_roles": [],
+      "expected_valid": false,
+      "expected_error": "invalid_value"
+    },
+    {
+      "name": "nul_in_tenant_id_is_invalid_value",
+      "user_id": "u-1",
+      "tenant_id": "ac\u0000me",
+      "tenant_roles": [],
+      "expected_valid": false,
+      "expected_error": "invalid_value"
+    },
+    {
+      "name": "nul_only_tenant_id_is_invalid_value",
+      "user_id": "",
+      "tenant_id": "\u0000",
+      "tenant_roles": [],
+      "expected_valid": false,
+      "expected_error": "invalid_value",
+      "note": "A NUL-only tenant_id is non-empty, so it scopes the GUCSet but is not a valid value."
+    },
+    {
+      "name": "nul_in_role_is_invalid_value",
+      "user_id": "u-1",
+      "tenant_id": "acme",
+      "tenant_roles": ["admin", "op\u0000erator"],
+      "expected_valid": false,
+      "expected_error": "invalid_value"
+    },
+    {
+      "name": "nul_in_user_id_without_tenant_is_inconsistent",
+      "user_id": "u\u00001",
+      "tenant_id": "",
+      "tenant_roles": [],
+      "expected_valid": false,
+      "expected_error": "inconsistent",
+      "note": "Precedence: user-without-tenant is checked before value validity."
+    },
+    {
+      "name": "nul_in_tenant_id_wins_over_empty_role",
+      "user_id": "u-1",
+      "tenant_id": "ac\u0000me",
+      "tenant_roles": [""],
+      "expected_valid": false,
+      "expected_error": "invalid_value",
+      "note": "Precedence: user_id/tenant_id values are checked before any role."
+    },
+    {
+      "name": "empty_role_before_later_nul_role",
+      "user_id": "u-1",
+      "tenant_id": "acme",
+      "tenant_roles": ["", "op\u0000"],
+      "expected_valid": false,
+      "expected_error": "empty_role",
+      "note": "Roles are checked in list order; the first failing role decides."
+    },
+    {
+      "name": "nul_role_before_later_comma_role",
+      "user_id": "u-1",
+      "tenant_id": "acme",
+      "tenant_roles": ["op\u0000", "a,b"],
+      "expected_valid": false,
+      "expected_error": "invalid_value"
+    },
+    {
+      "name": "comma_checked_before_nul_in_the_same_role",
+      "user_id": "u-1",
+      "tenant_id": "acme",
+      "tenant_roles": ["a,\u0000"],
+      "expected_valid": false,
+      "expected_error": "invalid_role",
+      "note": "Within one role: empty, then comma, then value validity."
+    },
+    {
+      "name": "non_ascii_utf8_values_are_valid",
+      "user_id": "\u00fc-1",
+      "tenant_id": "a\u00e7me",
+      "tenant_roles": ["r\u00f4le", "\u7ba1\u7406"],
+      "expected_valid": true,
+      "expected_error": null,
+      "note": "Valid non-ASCII UTF-8 is accepted by both."
     }
   ]
 }

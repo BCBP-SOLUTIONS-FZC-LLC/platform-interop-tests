@@ -1,0 +1,13 @@
+[
+{"key":"minimal","event_type":"interop.minimal","source":"interop-probe","payload":{"widget_id":"w1"},"opts":{},"group":"g0"},
+{"key":"all_fields","event_type":"interop.all_fields","source":"interop-probe","payload":{"order_id":"o-1","items":[{"sku":"a","qty":2}]},"opts":{"tenant_id": "acme", "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736", "correlation_id": "corr-1", "specversion": "1.0", "subject": "user/42", "actor": "svc:billing", "ip_address": "10.0.0.1", "user_agent": "Mozilla/5.0 (X11; Linux) <script>&"},"group":"g1"},
+{"key":"system_tenant","event_type":"interop.system_tenant","source":"interop-probe","payload":{"job":"nightly"},"opts":{"system_tenant": true},"group":"g2"},
+{"key":"unicode_html","event_type":"interop.unicode_html","source":"interop-probe","payload":{"name":"Zoë 😀 <b>&amp;</b>","sep":"a\u2028b","quote":"\"\\","rtl":"مرحبا"},"opts":{"tenant_id": "t\u00e9nant-\u00fc"},"group":"g0"},
+{"key":"escapes","event_type":"interop.escapes","source":"interop-probe","payload":{"esc":"\u00e9\/x\n\t"},"opts":{},"group":"g1"},
+{"key":"numbers","event_type":"interop.numbers","source":"interop-probe","payload":{ "big": 9223372036854775807, "bigger": 18446744073709551616, "f": 0.1, "small": 1e-7, "trail": 100.50, "neg": -0.0, "exp": 1E+2, "one": 1.0 },"opts":{"tenant_id": "acme"},"group":"g2"},
+{"key":"array","event_type":"interop.array","source":"interop-probe","payload":[1, "two", null, true, {"k": []}],"opts":{},"group":"g0"},
+{"key":"string","event_type":"interop.string","source":"interop-probe","payload":"just a string","opts":{},"group":"g1"},
+{"key":"null","event_type":"interop.null","source":"interop-probe","payload":null,"opts":{},"group":"g2"},
+{"key":"key_order","event_type":"interop.key_order","source":"interop-probe","payload":{"z":1,"a":{"y":2,"b":[{"c":3}]},"m":{}},"opts":{},"group":"g0"},
+{"key":"large","event_type":"interop.large","source":"interop-probe","payload":null,"payload_blob_bytes":150000,"opts":{},"group":"g1","skip_fifo":true}
+]

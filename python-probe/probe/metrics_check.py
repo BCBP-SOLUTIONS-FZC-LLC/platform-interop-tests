@@ -21,17 +21,23 @@ def run(args: list[str]) -> int:
     """
     registry = CollectorRegistry()
     go_only: list[str] = []
+    names: list[str] = []
     if hasattr(metrics_module, "init_metrics"):
         identity = metrics_module.MetricsIdentity(domain="iam", service="interop-probe", environment="test")
-        metrics_module.init_metrics(identity, registry)
+        warnings = metrics_module.init_metrics(identity, registry)
+        if warnings:
+            raise SystemExit(f"init_metrics refused metrics: {[str(w) for w in warnings]}")
         from eventcommon import metrics_registry
 
         go_only = sorted(getattr(metrics_registry, "GO_ONLY_METRICS", {}))
+        # As go-probe does: the Tier 1 entries of the library's own registry, once they
+        # registered without a warning. A scrape is only a cross-check — like Go's
+        # client, eventcommon gathers a family only once it has a series.
+        names = sorted(e.name for e in metrics_registry.registry() if str(e.tier) == "platform")
 
-    # prometheus_client strips "_total" from a Counter's family name (it is
-    # re-added on the exposed sample); add it back so these are the literal
-    # names a scrape and Go use.
-    names = sorted(
+    # prometheus_client strips "_total" from a Counter's family name (it is re-added on
+    # the exposed sample); add it back so these are the literal names a scrape uses.
+    gathered = sorted(
         {
             mf.name if mf.type != "counter" or mf.name.endswith("_total") else f"{mf.name}_total"
             for mf in registry.collect()
@@ -44,6 +50,7 @@ def run(args: list[str]) -> int:
             "language": "python",
             "check": "metrics-check",
             "metric_names": names,
+            "gathered_with_samples": gathered,
             "go_only": go_only,
             "tier1_supported": hasattr(metrics_module, "init_metrics"),
         }
