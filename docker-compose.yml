@@ -17,15 +17,21 @@ services:
       timeout: 3s
       retries: 30
 
-  localstack:
-    image: localstack/localstack:3
+  floci:
+    # Floci — open-source (MIT), always-free AWS emulator; the platform's drop-in LocalStack
+    # replacement, pinned to the image platform-events uses (its docker-compose.yml /
+    # .docker-digests). Every service (SNS, SQS, …) is on :4566 with no SERVICES selection or
+    # auth token. The -compat image bundles the AWS CLI the healthcheck uses. The events
+    # checks create their own topics and queues, so no init hook is needed.
+    image: floci/floci:2.1.0-compat@sha256:bb98b11f837bdacdda21ce6635a0773509e50aa471c35be9332a9efef502127c
     environment:
-      SERVICES: sns,sqs
-      DEFAULT_REGION: us-east-1
+      FLOCI_DEFAULT_REGION: us-east-1
+      FLOCI_DEFAULT_ACCOUNT_ID: "000000000000"
     ports:
-      - "${INTEROP_LOCALSTACK_PORT:-54566}:4566"
+      - "${INTEROP_FLOCI_PORT:-54566}:4566"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      # --region is required: floci isolates resources per region.
+      test: ["CMD", "aws", "--region", "us-east-1", "sqs", "list-queues"]
       interval: 2s
-      timeout: 3s
+      timeout: 5s
       retries: 30

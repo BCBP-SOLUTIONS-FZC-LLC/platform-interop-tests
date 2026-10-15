@@ -19,7 +19,7 @@ items are genuinely proven here vs. verified by code inspection only.
 
 ```
 platform-interop-tests/
-  docker-compose.yml       # Postgres (with an RLS-protected test table) + LocalStack (SNS/SQS, provisioned but not yet wired into a check)
+  docker-compose.yml       # Postgres (RLS-protected test table; also the shared outbox) + floci (SNS/SQS emulator, as in platform-events)
   docker/init-rls.sql      # schema + seed rows for pg-rls-check
   fixtures/
     gucset_cases.json      # pair 1 — GUCSet.Validate() table-driven cases
@@ -28,6 +28,9 @@ platform-interop-tests/
     envelope_golden.json   # pair 3 — a real Go-emitted Envelope.JSON() capture
     hmac_vector.json        # pair 3 — a real Go-computed HMAC signature over the envelope above
     header_cases.json      # pair 2 — header validation/parsing test vectors
+    events_wire_cases.json # pair 3 — events published over SNS/SQS: every envelope field, payload
+                           #          shapes written as raw JSON literals (Go sends them byte for byte)
+    events_raw_bodies.json # pair 3 — hand-crafted SQS bodies for the consumer differential
   go-probe/                # one Go binary, subcommands below
   python-probe/            # one Python package (`python -m probe`), mirroring subcommands
   compare.py               # stdlib-only comparison logic, one function per check type
@@ -59,15 +62,15 @@ XPertSharedLib/
 ./run_interop.sh
 ```
 
-Requires Go, `uv`, and Docker. Builds both probes, brings up Postgres + LocalStack, runs every
+Requires Go, `uv`, and Docker. Builds both probes, brings up Postgres + floci, runs every
 check, prints a pass/fail table, tears down. Exits non-zero if anything fails.
 
-Host ports default to Postgres 55432, LocalStack 54566 and the two `http-serve` servers
+Host ports default to Postgres 55432, floci 54566 and the two `http-serve` servers
 18081 (Go) / 18082 (Python). Override them where another stack already holds one, and give the
 compose project its own name to run beside another checkout:
 
 ```bash
-COMPOSE_PROJECT_NAME=interop-mine INTEROP_POSTGRES_PORT=56432 INTEROP_LOCALSTACK_PORT=56566 \
+COMPOSE_PROJECT_NAME=interop-mine INTEROP_POSTGRES_PORT=56432 INTEROP_FLOCI_PORT=56566 \
   INTEROP_GO_HTTP_PORT=18091 INTEROP_PY_HTTP_PORT=18092 ./run_interop.sh
 ```
 
@@ -90,6 +93,10 @@ pgcommon-py 0.3.0 itself requires `asyncpg>=0.30,<0.32`, mirrored by python-prob
 | `hmac-check` | 3 | Both languages reproduce and verify a real Go-computed HMAC signature over the same envelope |
 | `hmac-sign` / `hmac-verify` | 3 | The *reverse* direction: python-probe signs, go-probe verifies — proving the check isn't one-directional |
 | `metrics-check` | 3 | Tier 1 (`platform_*`) metric parity under the Enterprise Platform Observability Standard. Go reports every Tier 1 entry of `events.MetricsRegistry()` after a successful `events.InitMetrics`. Python reports the `platform_*` families `eventcommon.metrics.init_metrics` registers, plus `GO_ONLY_METRICS`, the Go metrics the port deliberately does not emit. Go's set must equal Python's plus `GO_ONLY_METRICS`. The removed pre-standard names (`events_*`, `outbox_*`, `sqs_*`) are not compared. A pre-standard eventcommon fails with an explicit "needs the port" message. |
+| `events-publish` / `events-consume` | 3 | **Live SNS/SQS round trip, both directions** (`events-wire-check`). One language publishes every case of `events_wire_cases.json` through floci, the other consumes; `compare.py events_wire` checks every event arrived once with the same envelope fields (incl. Go's nanosecond `time`) and payload (Unicode, HTML characters, U+2028, existing escapes, integers beyond 64 bits, float literals, arrays, scalars, `null`, 150 KB), the routing attributes, the handler's trace ID / tenant GUC / baggage, and a span link to the producer's trace. Six scenarios per direction: single publish, HMAC signature attribute (signed by the producer, verified by the consumer), batch publish, Glue schema-registry codec, FIFO per-group order, FIFO batch + codec |
+| `events-consume` on `events_raw_bodies.json` | 3 | **Consumer differential** (`events-raw-check`): 37 hand-crafted SQS bodies (unknown fields, missing / unusual `time`, mixed-case keys, SNS notification wrapper, `NaN`, NUL tenant, …) sent to a Go and a Python consumer: both handle or drop each body alike and hand the handler the same envelope |
+| `events-outbox-enqueue` / `events-outbox-run` | 3 | **Shared outbox** (`events-outbox-check`): one language enqueues (half under one ordering key) into the outbox schema, the other language's runner publishes to SNS, the first consumes — every event handled, ordered-key events in enqueue order. Proves the two outbox schemas and migration tracking are one |
+| `events-topology` / `events-send-raw` | — | Python-only helpers: create a topic + raw-delivery queue (FIFO with `--fifo`) and send the raw bodies |
 | `header-check` | 2 | **Python-only.** `fastapicommon.auth.validation`'s functions against every case in `header_cases.json`. Go's equivalent logic (`internal/core/domain/validation.go`) is unexported and cannot be imported by this separate module — see "Known gaps" below |
 | `http-serve` | 2 | A live minimal server in each language (`gincommon`/`fastapicommon`, real middleware, real OTel). `run_interop.sh` drives both with the same request and compares: `/whoami`'s parsed identity fields, both languages' 401 error JSON shape (`{error,status,trace_id,request_id}`, message text allowed to differ), and end-to-end `traceparent` continuity in *both* call directions (`/call-other` propagates headers to the peer and echoes the peer's response) |
 
@@ -100,10 +107,6 @@ pgcommon-py 0.3.0 itself requires `asyncpg>=0.30,<0.32`, mirrored by python-prob
   rules forbid a separate module (this one) from importing it. The contract is still verified,
   just only observably, through `http-serve`'s live HTTP surface, not as a fast pure-function
   check the way Python's `header-check` is.
-- **LocalStack is provisioned but not yet wired into a check.** No SNS/SQS interop check exists
-  yet in this harness (the envelope/HMAC checks already cover wire-format compatibility without
-  needing a live broker). A live publish-from-Go/consume-from-Python round trip would be a
-  natural extension.
 - **Trace continuity is proven bidirectionally (Go→Python and Python→Go), not as a single 3-hop
   A→B→C chain in one request.** Each hop's propagation mechanism is proven symmetric and correct
   in both directions independently; a literal 3-hop chain would exercise the same mechanism

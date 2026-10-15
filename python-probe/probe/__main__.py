@@ -8,12 +8,18 @@ def main() -> int:
         print(
             "usage: python -m probe "
             "<gucset-check|hmac-check|hmac-sign|envelope-check|metrics-check|header-check|"
-            "pg-rls-check|pg-migrate|pg-migrate-check|pg-metrics-check|http-serve> [args...]",
+            "pg-rls-check|pg-migrate|pg-migrate-check|pg-metrics-check|http-serve|events-publish|"
+            "events-consume|events-topology|events-send-raw|events-outbox-enqueue|events-outbox-run> [args...]",
             file=sys.stderr,
         )
         return 2
 
     subcommand, rest = sys.argv[1], sys.argv[2:]
+
+    if subcommand.startswith("events-"):
+        from probe.events_wire import run as run_events
+
+        return run_events(subcommand, rest)
 
     if subcommand == "gucset-check":
         from probe.gucset import run

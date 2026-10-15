@@ -11,7 +11,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: go-probe <gucset-check|hmac-check|hmac-verify|envelope-check|metrics-check|pg-rls-check|pg-migrate|pg-metrics-check|http-serve> [args...]")
+		fmt.Fprintln(os.Stderr, "usage: go-probe <gucset-check|hmac-check|hmac-verify|envelope-check|metrics-check|pg-rls-check|pg-migrate|pg-metrics-check|http-serve|events-publish|events-consume|events-outbox-enqueue|events-outbox-run> [args...]")
 		os.Exit(2)
 	}
 
@@ -41,6 +41,14 @@ func main() {
 		err = runPGMetricsCheck(os.Args[2:])
 	case "http-serve":
 		err = runHTTPServe(os.Args[2:])
+	case "events-publish":
+		err = runEventsPublish(os.Args[2:])
+	case "events-consume":
+		err = runEventsConsume(os.Args[2:])
+	case "events-outbox-enqueue":
+		err = runEventsOutboxEnqueue(os.Args[2:])
+	case "events-outbox-run":
+		err = runEventsOutboxRun(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown subcommand %q\n", os.Args[1])
 		os.Exit(2)

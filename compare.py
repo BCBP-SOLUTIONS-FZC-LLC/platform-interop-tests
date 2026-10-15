@@ -74,6 +74,12 @@ def check_metrics(go_path: str, py_path: str) -> bool:
         problems.append(f"py_only={sorted(py - go)}")
     if go - py - go_only:
         problems.append(f"go_only (undeclared)={sorted(go - py - go_only)}")
+    # What a scrape of a freshly initialised registry exposes: both clients gather a
+    # family only once it has a series, so the pre-created series must be the same.
+    if "gathered_with_samples" in go_doc and "gathered_with_samples" in py_doc:
+        go_g, py_g = set(go_doc["gathered_with_samples"]), set(py_doc["gathered_with_samples"])
+        if go_g != py_g:
+            problems.append(f"gathered families differ: go_only={sorted(go_g - py_g)} py_only={sorted(py_g - go_g)}")
     if problems:
         print("metrics mismatch: " + "; ".join(problems), file=sys.stderr)
         return False
@@ -351,6 +357,119 @@ def check_trace_continuity(go_path: str, py_path: str) -> bool:
     return ok
 
 
+_ENVELOPE_FIELDS = ("id", "type", "source", "specversion", "tenant_id", "trace_id",
+                    "correlation_id", "subject", "actor", "ip_address", "user_agent", "time")
+
+
+def check_events_wire(sent_path: str, got_path: str, options: str = "") -> bool:
+    """One SNS/SQS direction: every event the producer probe sent was handled once by the
+    consumer probe, with the same envelope fields and payload, routing attributes,
+    handler context (trace ID, tenant GUC, baggage), a span link to the producer's trace
+    and — per `options` (comma-separated: codec, hmac, fifo) — a decoded codec payload, a
+    verifying HMAC signature, and FIFO per-group order."""
+    flags = set(filter(None, options.split(",")))
+    sent_doc, got_doc = _load(sent_path), _load(got_path)
+    sent, got = sent_doc["sent"], got_doc["received"]
+    producer = sent_doc["language"]
+    problems: list[str] = []
+    if len(got) != len(sent):
+        problems.append(f"received {len(got)} of {len(sent)}")
+    by_id = {g["envelope"]["id"]: g for g in got}
+    for s in sent:
+        env, key = s["envelope"], s["key"]
+        g = by_id.get(env["id"])
+        if g is None:
+            problems.append(f"{key}: not received")
+            continue
+        r = g["envelope"]
+        for field in _ENVELOPE_FIELDS:
+            if env.get(field, "") != r.get(field, ""):
+                problems.append(f"{key}: {field} sent {env.get(field)!r}, handler saw {r.get(field)!r}")
+        if "codec" in flags:
+            if not r.get("dataschema"):
+                problems.append(f"{key}: dataschema missing after codec decode")
+        elif env.get("dataschema", "") != r.get("dataschema", ""):
+            problems.append(f"{key}: dataschema differs")
+        if r.get("data") != env.get("data"):
+            problems.append(f"{key}: data differs")
+        if json.loads(g["payload_raw"] or "null") != env.get("data"):
+            problems.append(f"{key}: handler payload differs: {g['payload_raw'][:120]}")
+        if g["trace_id_ctx"] != env.get("trace_id", ""):
+            problems.append(f"{key}: handler trace ID {g['trace_id_ctx']!r}")
+        if not g["has_tenant_guc"] or g["tenant_guc"] != env.get("tenant_id", ""):
+            problems.append(f"{key}: handler tenant GUC {g['tenant_guc']!r}")
+        want_baggage = {"probe.lang": "go" if producer == "go" else "py"}
+        if g.get("baggage") != want_baggage:
+            problems.append(f"{key}: handler baggage {g.get('baggage')!r}, want {want_baggage!r}")
+        attrs = g.get("attributes") or {}
+        want = {"EventType": env["type"], "Source": env["source"], "EventID": env["id"]}
+        if env.get("tenant_id"):
+            want["TenantID"] = env["tenant_id"]
+        if env.get("subject"):
+            want["Subject"] = env["subject"]
+        for k, v in want.items():
+            if attrs.get(k) != v:
+                problems.append(f"{key}: attribute {k}={attrs.get(k)!r}, want {v!r}")
+        if "traceparent" not in attrs:
+            problems.append(f"{key}: no traceparent attribute")
+        if s["producer_trace_id"] not in (g.get("linked_trace_ids") or []):
+            problems.append(f"{key}: consumer span not linked to the producer's trace")
+        if "hmac" in flags and g.get("hmac_ok") is not True:
+            problems.append(f"{key}: the producer's HMAC signature does not verify")
+    if "fifo" in flags:
+        group_of = {s["envelope"]["id"]: s["group"] for s in sent}
+        order = [g["envelope"]["id"] for g in got]
+        for grp in sorted(set(group_of.values())):
+            want_order = [s["envelope"]["id"] for s in sent if s["group"] == grp]
+            got_order = [i for i in order if group_of.get(i) == grp]
+            if got_order != want_order:
+                problems.append(f"FIFO group {grp}: handled out of order")
+    for p in problems:
+        print(f"events-wire ({producer}->{got_doc['language']}): {p}", file=sys.stderr)
+    return not problems
+
+
+def check_events_raw(go_path: str, py_path: str) -> bool:
+    """Hand-crafted SQS bodies (events_raw_bodies.json): both consumers make the same
+    decision — handle, or drop as malformed — and hand the handler the same envelope."""
+    go = {g["attributes"]["Case"]: g for g in _load(go_path)["received"]}
+    py = {g["attributes"]["Case"]: g for g in _load(py_path)["received"]}
+    problems = []
+    for case in sorted(set(go) | set(py)):
+        g, p = go.get(case), py.get(case)
+        if (g is None) != (p is None):
+            problems.append(f"{case}: Go {'handled' if g else 'dropped'}, Python {'handled' if p else 'dropped'}")
+            continue
+        for k in sorted(set(g["envelope"]) | set(p["envelope"])):
+            if g["envelope"].get(k) != p["envelope"].get(k):
+                problems.append(f"{case}: {k} Go={g['envelope'].get(k)!r} Python={p['envelope'].get(k)!r}")
+        if json.loads(g["payload_raw"] or "null") != json.loads(p["payload_raw"] or "null"):
+            problems.append(f"{case}: handler payload differs")
+        for k in ("trace_id_ctx", "tenant_guc"):
+            if g[k] != p[k]:
+                problems.append(f"{case}: {k} Go={g[k]!r} Python={p[k]!r}")
+    for p in problems:
+        print(f"events-raw: {p}", file=sys.stderr)
+    return not problems
+
+
+def check_events_outbox(enqueued_path: str, got_path: str) -> bool:
+    """Shared outbox: every event one language enqueued was published by the other
+    language's runner and handled by the consumer, ordered-key events in enqueue order."""
+    enq, got = _load(enqueued_path), _load(got_path)["received"]
+    seen = [g["envelope"]["id"] for g in got]
+    problems = []
+    if sorted(seen) != sorted(enq["ids"]):
+        problems.append(f"handled {len(seen)} of {len(enq['ids'])} enqueued events")
+    if [i for i in seen if i in enq["ordered_ids"]] != enq["ordered_ids"]:
+        problems.append("ordered-key events handled out of enqueue order")
+    if any(g["tenant_guc"] != "acme" for g in got):
+        problems.append("handler tenant GUC is not the enqueued tenant")
+    for p in problems:
+        print(f"events-outbox: {p}", file=sys.stderr)
+    return not problems
+
+
 CHECKS = {
     "gucset": check_gucset,
     "rls": check_rls,
@@ -361,6 +480,9 @@ CHECKS = {
     "whoami": check_whoami,
     "error_shape": check_error_shape,
     "trace_continuity": check_trace_continuity,
+    "events_wire": check_events_wire,
+    "events_raw": check_events_raw,
+    "events_outbox": check_events_outbox,
 }
 
 

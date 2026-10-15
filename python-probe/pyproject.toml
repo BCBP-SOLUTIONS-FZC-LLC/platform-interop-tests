@@ -12,6 +12,8 @@ dependencies = [
     "httpx>=0.27",
     "uvicorn>=0.30",
     "fastapi>=0.110",
+    "boto3>=1.34",
+    "opentelemetry-sdk>=1.24",
 ]
 
 # Relative paths (not absolute) so this pyproject.toml resolves identically on any machine/CI
