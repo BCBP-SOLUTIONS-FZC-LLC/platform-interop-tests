@@ -29,9 +29,18 @@ declare -a FAILURES=()
 pass() { PASS=$((PASS + 1)); echo "  PASS: $1"; }
 fail() { FAIL=$((FAIL + 1)); FAILURES+=("$1"); echo "  FAIL: $1"; }
 
+# Kill a background server and its descendants: PY_SERVER_PID is the subshell around
+# `uv run python ...`, so killing it alone orphans the Python server, which keeps the port
+# and answers the next run's requests with stale code.
+kill_tree() {
+  local child
+  for child in $(pgrep -P "$1" 2>/dev/null); do kill_tree "$child"; done
+  kill "$1" 2>/dev/null
+}
+
 cleanup() {
-  [ -n "$GO_SERVER_PID" ] && kill "$GO_SERVER_PID" 2>/dev/null
-  [ -n "$PY_SERVER_PID" ] && kill "$PY_SERVER_PID" 2>/dev/null
+  [ -n "$GO_SERVER_PID" ] && kill_tree "$GO_SERVER_PID"
+  [ -n "$PY_SERVER_PID" ] && kill_tree "$PY_SERVER_PID"
   if [ "$COMPOSE_STARTED" = "1" ]; then
     (cd "$ROOT" && docker compose down -v) >/dev/null 2>&1
   fi
@@ -340,7 +349,8 @@ python3 "$ROOT/compare.py" trace_continuity "$ROOT/.build/go_call_other.json" "$
   && pass "trace continuity: own_trace_id == peer's reported trace_id, both directions" \
   || fail "trace continuity: trace ID did not propagate correctly in one direction"
 
-kill "$GO_SERVER_PID" "$PY_SERVER_PID" 2>/dev/null
+kill_tree "$GO_SERVER_PID"
+kill_tree "$PY_SERVER_PID"
 GO_SERVER_PID=""
 PY_SERVER_PID=""
 
