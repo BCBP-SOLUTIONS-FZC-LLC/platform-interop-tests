@@ -346,12 +346,23 @@ def check_error_shape(
     go_content_type: str = _PROBLEM_MEDIA_TYPE,
     py_content_type: str = _PROBLEM_MEDIA_TYPE,
 ) -> bool:
-    """Both languages' 401 for a request without identity is the same RFC 9457 problem:
+    """Both languages' 401 for a request without identity uses the same contract. Both legacy
+    bodies ({error,status,trace_id,request_id}) pass during the migration; otherwise both must
+    be the same RFC 9457 problem — one language on each contract fails:
     application/problem+json, all required members, identical type/title/status/detail/
     errorCode, and no tenantId (the identity was not verified). instance, traceId and
     timestamp are per-request and may differ."""
     go = _load(go_path)
     py = _load(py_path)
+    legacy_keys = {"error", "status", "trace_id", "request_id"}
+    if set(go) == legacy_keys and set(py) == legacy_keys:
+        # Both still on the pre-RFC 9457 contract (gincommon < v2 and fastapicommon 0.2.x):
+        # the same contract in both languages, which is what this check guards. Kept so a
+        # library's PR or the nightly run is not failed while the two migrate in turn.
+        if go_status != "401" or py_status != "401":
+            print(f"error_shape: expected both 401, got go={go_status} py={py_status}", file=sys.stderr)
+            return False
+        return True
     ok = True
     if go_status != "401" or py_status != "401":
         print(f"error_shape: expected both 401, got go={go_status} py={py_status}", file=sys.stderr)
