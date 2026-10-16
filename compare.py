@@ -331,17 +331,48 @@ def check_whoami(go_path: str, py_path: str) -> bool:
     return True
 
 
-def check_error_shape(go_path: str, py_path: str, go_status: str, py_status: str) -> bool:
+# RFC 9457 Problem Details (gincommon v2 / fastapicommon): the members every problem carries,
+# and the ones that must be identical for the same error regardless of the serving language.
+_PROBLEM_REQUIRED = {"type", "title", "status", "instance", "traceId", "errorCode", "timestamp"}
+_PROBLEM_SAME = ("type", "title", "status", "detail", "errorCode")
+_PROBLEM_MEDIA_TYPE = "application/problem+json"
+
+
+def check_error_shape(
+    go_path: str,
+    py_path: str,
+    go_status: str,
+    py_status: str,
+    go_content_type: str = _PROBLEM_MEDIA_TYPE,
+    py_content_type: str = _PROBLEM_MEDIA_TYPE,
+) -> bool:
+    """Both languages' 401 for a request without identity is the same RFC 9457 problem:
+    application/problem+json, all required members, identical type/title/status/detail/
+    errorCode, and no tenantId (the identity was not verified). instance, traceId and
+    timestamp are per-request and may differ."""
     go = _load(go_path)
     py = _load(py_path)
-    expected_keys = {"error", "status", "trace_id", "request_id"}
-    if set(go) != expected_keys or set(py) != expected_keys:
-        print(f"error_shape key mismatch: go_keys={set(go)} py_keys={set(py)}", file=sys.stderr)
-        return False
+    ok = True
     if go_status != "401" or py_status != "401":
         print(f"error_shape: expected both 401, got go={go_status} py={py_status}", file=sys.stderr)
-        return False
-    return True
+        ok = False
+    for lang, ct in (("go", go_content_type), ("py", py_content_type)):
+        if ct.split(";", 1)[0].strip().lower() != _PROBLEM_MEDIA_TYPE:
+            print(f"error_shape: {lang} Content-Type {ct!r}, want {_PROBLEM_MEDIA_TYPE}", file=sys.stderr)
+            ok = False
+    for lang, body in (("go", go), ("py", py)):
+        missing = _PROBLEM_REQUIRED - set(body)
+        if missing:
+            print(f"error_shape: {lang} problem is missing {sorted(missing)}: {body}", file=sys.stderr)
+            ok = False
+        if "tenantId" in body:
+            print(f"error_shape: {lang} 401 carries tenantId {body['tenantId']!r}", file=sys.stderr)
+            ok = False
+    for k in _PROBLEM_SAME:
+        if go.get(k) != py.get(k):
+            print(f"error_shape: {k} differs: go={go.get(k)!r} py={py.get(k)!r}", file=sys.stderr)
+            ok = False
+    return ok
 
 
 def check_trace_continuity(go_path: str, py_path: str) -> bool:
