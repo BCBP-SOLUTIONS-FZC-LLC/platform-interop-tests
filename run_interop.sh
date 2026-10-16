@@ -340,7 +340,7 @@ PY_401=$(curl -s -o "$ROOT/.build/py_401.json" -w "%{http_code}" "http://localho
 GO_401_CT=$(curl -s -o /dev/null -w "%{content_type}" "http://localhost:${GO_HTTP_PORT}/whoami")
 PY_401_CT=$(curl -s -o /dev/null -w "%{content_type}" "http://localhost:${PY_HTTP_PORT}/whoami-protected")
 python3 "$ROOT/compare.py" error_shape "$ROOT/.build/go_401.json" "$ROOT/.build/py_401.json" "$GO_401" "$PY_401" "$GO_401_CT" "$PY_401_CT" \
-  && pass "error shape: both 401s use the same error contract (status=$GO_401/$PY_401)" \
+  && pass "error shape: both 401s are the same RFC 9457 problem (status=$GO_401/$PY_401)" \
   || fail "error shape: 401 bodies diverge (status=$GO_401/$PY_401)"
 
 curl -s "${HEADERS[@]}" "http://localhost:${GO_HTTP_PORT}/call-other" > "$ROOT/.build/go_call_other.json" 2>&1
