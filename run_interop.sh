@@ -343,6 +343,21 @@ python3 "$ROOT/compare.py" error_shape "$ROOT/.build/go_401.json" "$ROOT/.build/
   && pass "error shape: both 401s are the same RFC 9457 problem (status=$GO_401/$PY_401)" \
   || fail "error shape: 401 bodies diverge (status=$GO_401/$PY_401)"
 
+# RFC 9457 extension members (gincommon v2.1+ / fastapicommon 0.4+): the same 409 problem, byte
+# for byte but the timestamp. One x-request-id for both, so traceId is the same too.
+EXT_REQ_ID="interop-problem-extensions"
+for lang_port in "go:$GO_HTTP_PORT" "py:$PY_HTTP_PORT"; do
+  lang=${lang_port%%:*}
+  meta=$(curl -s "${HEADERS[@]}" -H "x-request-id: $EXT_REQ_ID" -o "$ROOT/.build/${lang}_problem_ext.json" \
+    -w "%{http_code} %{content_type}" "http://localhost:${lang_port#*:}/problem-extensions")
+  printf -v "${lang}_EXT_STATUS" '%s' "${meta%% *}"
+  printf -v "${lang}_EXT_CT" '%s' "${meta#* }"
+done
+python3 "$ROOT/compare.py" problem_extensions "$ROOT/.build/go_problem_ext.json" "$ROOT/.build/py_problem_ext.json" \
+  "$go_EXT_STATUS" "$py_EXT_STATUS" "$go_EXT_CT" "$py_EXT_CT" "$EXT_REQ_ID" \
+  && pass "problem extensions: both 409s are the same problem bytes, extension members sorted after the standard ones" \
+  || fail "problem extensions: the 409 bodies diverge (status=$go_EXT_STATUS/$py_EXT_STATUS)"
+
 curl -s "${HEADERS[@]}" "http://localhost:${GO_HTTP_PORT}/call-other" > "$ROOT/.build/go_call_other.json" 2>&1
 curl -s "${HEADERS[@]}" "http://localhost:${PY_HTTP_PORT}/call-other" > "$ROOT/.build/py_call_other.json" 2>&1
 python3 "$ROOT/compare.py" trace_continuity "$ROOT/.build/go_call_other.json" "$ROOT/.build/py_call_other.json" \
