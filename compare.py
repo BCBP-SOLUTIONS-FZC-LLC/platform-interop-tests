@@ -375,6 +375,59 @@ def check_error_shape(
     return ok
 
 
+# The extension members both probes' /problem-extensions send, as they must appear on the wire:
+# after the standard members, sorted by name (upper case first), the colliding and invalid
+# names (status, traceId, TenantID, bad-name) dropped.
+_PROBLEM_EXTENSIONS_TAIL = ',"Zeta":true,"active_workflows":["wf-1","wf-2"],"record_version":7}'
+_PROBLEM_TIMESTAMP = re.compile(r'"timestamp":"[^"]*"')
+
+
+def check_problem_extensions(
+    go_path: str,
+    py_path: str,
+    go_status: str,
+    py_status: str,
+    go_content_type: str,
+    py_content_type: str,
+    request_id: str,
+) -> bool:
+    """Both languages send the same 409 problem with RFC 9457 extension members (gincommon
+    v2.1.0 / fastapicommon 0.4.0), byte for byte except the per-request timestamp: same
+    standard members in the same order, traceId from the shared x-request-id, the verified
+    tenantId, then the extension members sorted by name with every standard-member or
+    invalid name dropped."""
+    with open(go_path, encoding="utf-8") as f:
+        go_raw = f.read()
+    with open(py_path, encoding="utf-8") as f:
+        py_raw = f.read()
+    ok = True
+    if go_status != "409" or py_status != "409":
+        print(f"problem_extensions: expected both 409, got go={go_status} py={py_status}", file=sys.stderr)
+        ok = False
+    for lang, ct in (("go", go_content_type), ("py", py_content_type)):
+        if ct.split(";", 1)[0].strip().lower() != _PROBLEM_MEDIA_TYPE:
+            print(f"problem_extensions: {lang} Content-Type {ct!r}, want {_PROBLEM_MEDIA_TYPE}", file=sys.stderr)
+            ok = False
+    for lang, raw in (("go", go_raw), ("py", py_raw)):
+        if not raw.endswith(_PROBLEM_EXTENSIONS_TAIL):
+            print(f"problem_extensions: {lang} body does not end with {_PROBLEM_EXTENSIONS_TAIL}: {raw}", file=sys.stderr)
+            ok = False
+        try:
+            body = json.loads(raw)
+        except ValueError:
+            print(f"problem_extensions: {lang} body is not JSON: {raw!r}", file=sys.stderr)
+            return False
+        if body.get("status") != 409 or body.get("traceId") != request_id or raw.count('"status"') != 1:
+            print(f"problem_extensions: {lang} standard members overwritten: {raw}", file=sys.stderr)
+            ok = False
+    go_norm = _PROBLEM_TIMESTAMP.sub('"timestamp":"-"', go_raw)
+    py_norm = _PROBLEM_TIMESTAMP.sub('"timestamp":"-"', py_raw)
+    if go_norm != py_norm:
+        print(f"problem_extensions: bodies differ (timestamp masked):\n  go={go_norm}\n  py={py_norm}", file=sys.stderr)
+        ok = False
+    return ok
+
+
 def check_trace_continuity(go_path: str, py_path: str) -> bool:
     go = _load(go_path)
     py = _load(py_path)
@@ -510,6 +563,7 @@ CHECKS = {
     "pgmetrics": check_pgmetrics,
     "whoami": check_whoami,
     "error_shape": check_error_shape,
+    "problem_extensions": check_problem_extensions,
     "trace_continuity": check_trace_continuity,
     "events_wire": check_events_wire,
     "events_raw": check_events_raw,

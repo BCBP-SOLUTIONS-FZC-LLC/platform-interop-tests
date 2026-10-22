@@ -10,13 +10,15 @@ import (
 	"strings"
 
 	"github.com/BCBP-SOLUTIONS-FZC-LLC/platform-gincommon/pkg/gincommon"
+	"github.com/BCBP-SOLUTIONS-FZC-LLC/platform-gincommon/pkg/problem"
 	"github.com/gin-gonic/gin"
 )
 
 // runHTTPServe starts a minimal gincommon-based HTTP server exercising the pair-2 contract:
 // /health (unauthenticated), /whoami (protected — returns the parsed RequestContext), and
 // /call-other (protected — propagates headers to --peer and returns what it got back, used for
-// the cross-service trace-continuity check). This is the Go side of the pair-2 interop test;
+// the cross-service trace-continuity check), and /problem-extensions (protected — a 409 problem
+// with RFC 9457 extension members, gincommon v2.1+, compared byte for byte with Python's). This is the Go side of the pair-2 interop test;
 // pair 2's header-validation rules live in gincommon's unexported internal/core/domain package
 // and can only be exercised this way (via the real HTTP surface), not called directly.
 func runHTTPServe(args []string) error {
@@ -52,6 +54,22 @@ func runHTTPServe(args []string) error {
 			"trace_id":  rc.TraceID,
 			"client_ip": rc.ClientIP,
 		})
+	})
+
+	// The same problem python-probe's /problem-extensions raises: extensions set one at a time
+	// and as a map, out of order, plus names that collide with standard members (dropped).
+	protected.GET("/problem-extensions", func(c *gin.Context) {
+		gincommon.AbortWithProblem(c, problem.NewConflictError("The tenant was modified concurrently.").
+			WithCode("VERSION_CONFLICT").
+			WithExtension("record_version", 7).
+			WithExtensions(map[string]any{
+				"active_workflows": []string{"wf-1", "wf-2"},
+				"Zeta":             true,
+				"status":           200,
+				"traceId":          "forged",
+				"TenantID":         "other-tenant",
+				"bad-name":         1,
+			}))
 	})
 
 	protected.GET("/call-other", func(c *gin.Context) {

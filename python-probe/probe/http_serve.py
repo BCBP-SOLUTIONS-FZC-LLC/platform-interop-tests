@@ -8,6 +8,7 @@ from fastapi import Depends, FastAPI
 from fastapicommon.auth import CurrentUser, require_authenticated_user
 from fastapicommon.bootstrap import create_platform_app
 from fastapicommon.context import get_request_context
+from fastapicommon.exceptions import ConflictException
 from fastapicommon.propagation import create_platform_http_client
 
 
@@ -42,6 +43,25 @@ def build_app() -> FastAPI:
             "user_id": user.user_id,
             "roles": list(ctx.roles),
         }
+
+    @app.get("/problem-extensions")
+    async def problem_extensions() -> None:
+        # The same problem go-probe's /problem-extensions sends (fastapicommon 0.4+): extension
+        # members after the standard ones, sorted by name, colliding/invalid names dropped.
+        raise (
+            ConflictException("The tenant was modified concurrently.", code="VERSION_CONFLICT")
+            .with_extension("record_version", 7)
+            .with_extensions(
+                {
+                    "active_workflows": ["wf-1", "wf-2"],
+                    "Zeta": True,
+                    "status": 200,
+                    "traceId": "forged",
+                    "TenantID": "other-tenant",
+                    "bad-name": 1,
+                }
+            )
+        )
 
     @app.get("/call-other")
     async def call_other() -> dict[str, object]:
