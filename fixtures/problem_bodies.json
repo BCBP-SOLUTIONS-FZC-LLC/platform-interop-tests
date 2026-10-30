@@ -1,0 +1,407 @@
+{
+  "_comment": "Real RFC 9457 error responses captured from platform-gincommon (go-probe problem-bodies) and platform-fastapicommon (python-probe problem-bodies), one per scenario and language, with each request's traceparent and x-request-id fixed. `body` is the raw response body; `expected` is gincommon's own client decoder (problem.FromResponse) applied to it, the reference the frontend SDK's parseProblemResponse must match. A capture, not a contract: regenerate with go-probe problem-bodies --python \u003cpython capture\u003e.",
+  "cases": [
+    {
+      "name": "validation_failed",
+      "source": "go",
+      "path": "/validation",
+      "status": 400,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-validation-failed",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/validation-failed\",\"title\":\"Validation failed\",\"status\":400,\"instance\":\"/validation\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"VALIDATION_FAILED\",\"timestamp\":\"2026-10-30T12:13:47Z\",\"validationErrors\":[{\"field\":\"deadline\",\"message\":\"must be in the future\"},{\"field\":\"items[0].sku\",\"message\":\"is required\"}]}",
+      "expected": {
+        "type": "https://errors.company.com/platform/validation-failed",
+        "title": "Validation failed",
+        "status": 400,
+        "instance": "/validation",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "VALIDATION_FAILED",
+        "timestamp": "2026-10-30T12:13:47Z",
+        "validationErrors": [
+          {
+            "field": "deadline",
+            "message": "must be in the future"
+          },
+          {
+            "field": "items[0].sku",
+            "message": "is required"
+          }
+        ],
+        "extensions": {}
+      }
+    },
+    {
+      "name": "not_found",
+      "source": "go",
+      "path": "/tenders/123",
+      "status": 404,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-not-found",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/not-found\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"Tender 123 was not found.\",\"instance\":\"/tenders/123\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"TENDER_NOT_FOUND\",\"timestamp\":\"2026-10-30T12:13:47Z\"}",
+      "expected": {
+        "type": "https://errors.company.com/platform/not-found",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "Tender 123 was not found.",
+        "instance": "/tenders/123",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "TENDER_NOT_FOUND",
+        "timestamp": "2026-10-30T12:13:47Z",
+        "extensions": {}
+      }
+    },
+    {
+      "name": "conflict_with_extensions",
+      "source": "go",
+      "path": "/conflict",
+      "status": 409,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-conflict-with-extensions",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/conflict\",\"title\":\"Conflict\",\"status\":409,\"detail\":\"The tenant was modified concurrently.\",\"instance\":\"/conflict\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"VERSION_CONFLICT\",\"timestamp\":\"2026-10-30T12:13:47Z\",\"Zeta\":true,\"active_workflows\":[\"wf-1\",\"wf-2\"],\"record_version\":7}",
+      "expected": {
+        "type": "https://errors.company.com/platform/conflict",
+        "title": "Conflict",
+        "status": 409,
+        "detail": "The tenant was modified concurrently.",
+        "instance": "/conflict",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "VERSION_CONFLICT",
+        "timestamp": "2026-10-30T12:13:47Z",
+        "extensions": {
+          "Zeta": true,
+          "active_workflows": [
+            "wf-1",
+            "wf-2"
+          ],
+          "record_version": 7
+        }
+      }
+    },
+    {
+      "name": "internal_error",
+      "source": "go",
+      "path": "/internal",
+      "status": 500,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-internal-error",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/internal-error\",\"title\":\"Internal Server Error\",\"status\":500,\"instance\":\"/internal\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"INTERNAL_ERROR\",\"timestamp\":\"2026-10-30T12:13:47Z\"}",
+      "expected": {
+        "type": "https://errors.company.com/platform/internal-error",
+        "title": "Internal Server Error",
+        "status": 500,
+        "instance": "/internal",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "INTERNAL_ERROR",
+        "timestamp": "2026-10-30T12:13:47Z",
+        "extensions": {}
+      }
+    },
+    {
+      "name": "unauthorized",
+      "source": "go",
+      "path": "/protected",
+      "status": 401,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-unauthorized",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/unauthorized\",\"title\":\"Unauthorized\",\"status\":401,\"detail\":\"Missing or invalid authentication headers.\",\"instance\":\"/protected\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"UNAUTHORIZED\",\"timestamp\":\"2026-10-30T12:13:47Z\"}",
+      "expected": {
+        "type": "https://errors.company.com/platform/unauthorized",
+        "title": "Unauthorized",
+        "status": 401,
+        "detail": "Missing or invalid authentication headers.",
+        "instance": "/protected",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "UNAUTHORIZED",
+        "timestamp": "2026-10-30T12:13:47Z",
+        "extensions": {}
+      }
+    },
+    {
+      "name": "route_not_found",
+      "source": "go",
+      "path": "/no-such-route",
+      "status": 404,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-route-not-found",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/not-found\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"No route matches the request path.\",\"instance\":\"/no-such-route\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"ROUTE_NOT_FOUND\",\"timestamp\":\"2026-10-30T12:13:47Z\"}",
+      "expected": {
+        "type": "https://errors.company.com/platform/not-found",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No route matches the request path.",
+        "instance": "/no-such-route",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "ROUTE_NOT_FOUND",
+        "timestamp": "2026-10-30T12:13:47Z",
+        "extensions": {}
+      }
+    },
+    {
+      "name": "about_blank",
+      "source": "go",
+      "path": "/gone",
+      "status": 410,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-about-blank",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"about:blank\",\"title\":\"Gone\",\"status\":410,\"detail\":\"The tender was withdrawn.\",\"instance\":\"/gone\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"GONE\",\"timestamp\":\"2026-10-30T12:13:47Z\"}",
+      "expected": {
+        "type": "about:blank",
+        "title": "Gone",
+        "status": 410,
+        "detail": "The tender was withdrawn.",
+        "instance": "/gone",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "GONE",
+        "timestamp": "2026-10-30T12:13:47Z",
+        "extensions": {}
+      }
+    },
+    {
+      "name": "server_timeout",
+      "source": "go",
+      "path": "/slow",
+      "status": 503,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-server-timeout",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/service-unavailable\",\"title\":\"Service Unavailable\",\"status\":503,\"detail\":\"The request timed out.\",\"instance\":\"/slow\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"REQUEST_TIMEOUT\",\"timestamp\":\"2026-10-30T12:13:47Z\"}",
+      "expected": {
+        "type": "https://errors.company.com/platform/service-unavailable",
+        "title": "Service Unavailable",
+        "status": 503,
+        "detail": "The request timed out.",
+        "instance": "/slow",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "REQUEST_TIMEOUT",
+        "timestamp": "2026-10-30T12:13:47Z",
+        "extensions": {}
+      }
+    },
+    {
+      "name": "validation_failed",
+      "source": "python",
+      "path": "/validation",
+      "status": 400,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-validation-failed",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/validation-failed\",\"title\":\"Validation failed\",\"status\":400,\"instance\":\"/validation\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"VALIDATION_FAILED\",\"timestamp\":\"2026-10-30T12:12:39Z\",\"validationErrors\":[{\"field\":\"deadline\",\"message\":\"must be in the future\"},{\"field\":\"items[0].sku\",\"message\":\"is required\"}]}",
+      "expected": {
+        "type": "https://errors.company.com/platform/validation-failed",
+        "title": "Validation failed",
+        "status": 400,
+        "instance": "/validation",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "VALIDATION_FAILED",
+        "timestamp": "2026-10-30T12:12:39Z",
+        "validationErrors": [
+          {
+            "field": "deadline",
+            "message": "must be in the future"
+          },
+          {
+            "field": "items[0].sku",
+            "message": "is required"
+          }
+        ],
+        "extensions": {}
+      }
+    },
+    {
+      "name": "not_found",
+      "source": "python",
+      "path": "/tenders/123",
+      "status": 404,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-not-found",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/not-found\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"Tender 123 was not found.\",\"instance\":\"/tenders/123\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"TENDER_NOT_FOUND\",\"timestamp\":\"2026-10-30T12:12:39Z\"}",
+      "expected": {
+        "type": "https://errors.company.com/platform/not-found",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "Tender 123 was not found.",
+        "instance": "/tenders/123",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "TENDER_NOT_FOUND",
+        "timestamp": "2026-10-30T12:12:39Z",
+        "extensions": {}
+      }
+    },
+    {
+      "name": "conflict_with_extensions",
+      "source": "python",
+      "path": "/conflict",
+      "status": 409,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-conflict-with-extensions",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/conflict\",\"title\":\"Conflict\",\"status\":409,\"detail\":\"The tenant was modified concurrently.\",\"instance\":\"/conflict\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"VERSION_CONFLICT\",\"timestamp\":\"2026-10-30T12:12:39Z\",\"Zeta\":true,\"active_workflows\":[\"wf-1\",\"wf-2\"],\"record_version\":7}",
+      "expected": {
+        "type": "https://errors.company.com/platform/conflict",
+        "title": "Conflict",
+        "status": 409,
+        "detail": "The tenant was modified concurrently.",
+        "instance": "/conflict",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "VERSION_CONFLICT",
+        "timestamp": "2026-10-30T12:12:39Z",
+        "extensions": {
+          "Zeta": true,
+          "active_workflows": [
+            "wf-1",
+            "wf-2"
+          ],
+          "record_version": 7
+        }
+      }
+    },
+    {
+      "name": "internal_error",
+      "source": "python",
+      "path": "/internal",
+      "status": 500,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-internal-error",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/internal-error\",\"title\":\"Internal Server Error\",\"status\":500,\"instance\":\"/internal\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"INTERNAL_ERROR\",\"timestamp\":\"2026-10-30T12:12:39Z\"}",
+      "expected": {
+        "type": "https://errors.company.com/platform/internal-error",
+        "title": "Internal Server Error",
+        "status": 500,
+        "instance": "/internal",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "INTERNAL_ERROR",
+        "timestamp": "2026-10-30T12:12:39Z",
+        "extensions": {}
+      }
+    },
+    {
+      "name": "unauthorized",
+      "source": "python",
+      "path": "/protected",
+      "status": 401,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-unauthorized",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/unauthorized\",\"title\":\"Unauthorized\",\"status\":401,\"detail\":\"Missing or invalid authentication headers.\",\"instance\":\"/protected\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"UNAUTHORIZED\",\"timestamp\":\"2026-10-30T12:12:39Z\"}",
+      "expected": {
+        "type": "https://errors.company.com/platform/unauthorized",
+        "title": "Unauthorized",
+        "status": 401,
+        "detail": "Missing or invalid authentication headers.",
+        "instance": "/protected",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "UNAUTHORIZED",
+        "timestamp": "2026-10-30T12:12:39Z",
+        "extensions": {}
+      }
+    },
+    {
+      "name": "route_not_found",
+      "source": "python",
+      "path": "/no-such-route",
+      "status": 404,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-route-not-found",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/not-found\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"No route matches the request path.\",\"instance\":\"/no-such-route\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"ROUTE_NOT_FOUND\",\"timestamp\":\"2026-10-30T12:12:39Z\"}",
+      "expected": {
+        "type": "https://errors.company.com/platform/not-found",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "No route matches the request path.",
+        "instance": "/no-such-route",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "ROUTE_NOT_FOUND",
+        "timestamp": "2026-10-30T12:12:39Z",
+        "extensions": {}
+      }
+    },
+    {
+      "name": "about_blank",
+      "source": "python",
+      "path": "/gone",
+      "status": 410,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-about-blank",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"about:blank\",\"title\":\"Gone\",\"status\":410,\"detail\":\"The tender was withdrawn.\",\"instance\":\"/gone\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"GONE\",\"timestamp\":\"2026-10-30T12:12:39Z\"}",
+      "expected": {
+        "type": "about:blank",
+        "title": "Gone",
+        "status": 410,
+        "detail": "The tender was withdrawn.",
+        "instance": "/gone",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "GONE",
+        "timestamp": "2026-10-30T12:12:39Z",
+        "extensions": {}
+      }
+    },
+    {
+      "name": "server_timeout",
+      "source": "python",
+      "path": "/slow",
+      "status": 503,
+      "headers": {
+        "content-type": "application/problem+json",
+        "x-request-id": "fixture-server-timeout",
+        "x-trace-id": "4bf92f3577b34da6a3ce929d0e0e4736"
+      },
+      "body": "{\"type\":\"https://errors.company.com/platform/service-unavailable\",\"title\":\"Service Unavailable\",\"status\":503,\"detail\":\"The request timed out.\",\"instance\":\"/slow\",\"traceId\":\"4bf92f3577b34da6a3ce929d0e0e4736\",\"errorCode\":\"REQUEST_TIMEOUT\",\"timestamp\":\"2026-10-30T12:12:39Z\"}",
+      "expected": {
+        "type": "https://errors.company.com/platform/service-unavailable",
+        "title": "Service Unavailable",
+        "status": 503,
+        "detail": "The request timed out.",
+        "instance": "/slow",
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "errorCode": "REQUEST_TIMEOUT",
+        "timestamp": "2026-10-30T12:12:39Z",
+        "extensions": {}
+      }
+    }
+  ],
+  "requestHeaders": {
+    "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    "x-request-id": "fixture-\u003cscenario\u003e"
+  }
+}
