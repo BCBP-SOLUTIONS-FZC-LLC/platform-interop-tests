@@ -28,6 +28,8 @@ platform-interop-tests/
     envelope_golden.json   # pair 3 — a real Go-emitted Envelope.JSON() capture
     hmac_vector.json        # pair 3 — a real Go-computed HMAC signature over the envelope above
     header_cases.json      # pair 2 — header validation/parsing test vectors
+    identity_cases.json    # service/domain/environment/version identity vectors (gincommon registry ↔ frontend SDK)
+    redaction_cases.json   # log redaction vectors (gincommon log_sanitizer.go ↔ fastapicommon ↔ frontend SDK)
     events_wire_cases.json # pair 3 — events published over SNS/SQS: every envelope field, payload
                            #          shapes written as raw JSON literals (Go sends them byte for byte)
     events_raw_bodies.json # pair 3 — hand-crafted SQS bodies for the consumer differential
@@ -85,6 +87,7 @@ pgcommon-py 0.3.0 itself requires `asyncpg>=0.30,<0.32`, mirrored by python-prob
 | Subcommand | Pair | What it proves |
 |---|---|---|
 | `contracts-export` | — | **go-probe only, an export, not a check.** Prints gincommon's public contracts as JSON: the problem type registry (`PlatformTypes()`), the problem constants, `TypeForStatus` for every known status, and the transport header names. The frontend SDK (`platform-reactcommon`, `scripts/sync-contracts.ts`) generates its `contracts/` files from this output, so the browser uses exactly what services emit. Not run by `run_interop.sh` |
+| `identity-check` | — | **go-probe only for now.** Runs every case in `identity_cases.json` through gincommon's registry identity rules (`IsDomain`, the service pattern, `NormalizeEnvironment`, then the trimmed build version or `unknown` through `CheckVersion`) and reports per case whether the result matches the fixture. The frontend SDK's `initializeCore` runs the same file. Not run by `run_interop.sh` yet: a Python identity-check would make it a pair check |
 | `gucset-check` | 1 | Both languages' `GUCSet.Validate()` agree, for every case in `gucset_cases.json`, on accept/reject and on *which* error fired: user without tenant (`inconsistent`), tenant roles without tenant (`roles_without_tenant`), empty role, comma in a role (`invalid_role`), and a NUL in `user_id`/`tenant_id`/a role (`invalid_value`) — including each rule's precedence when several apply. Invalid values use NUL only: a lone surrogate or invalid UTF-8 decodes differently from JSON in Go and Python. python-probe maps every `pgcommon.IDENTITY_ERRORS` member and reports an unmapped one (or any unexpected exception) as `unknown:…` instead of crashing |
 | `pg-rls-check` | 1 | A Go connection and a Python connection, each scoped to the same `tenant_id` under the *same* real Postgres RLS policy, see the *same* row set — in both standard (session-scoped `is_local=false`) and PgBouncer-simulated (transaction-scoped `is_local=true`) modes |
 | `pg-migrate` | 1 | One `migrate.Runner` operation (`up`, `down N`, `steps N`, `version`, `force V`) in each language, reported as JSON — the building block `pg-migrate-check` drives |

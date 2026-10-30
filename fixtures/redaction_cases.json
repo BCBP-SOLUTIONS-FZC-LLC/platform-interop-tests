@@ -1,0 +1,383 @@
+{
+  "_comment": "Log redaction vectors for platform-gincommon internal/core/service/log_sanitizer.go (isSensitiveLogKey, Sanitize, SanitizeString), fastapicommon logging/sanitize.py and @platform/frontend-sdk/core (isSensitiveKey, sanitizeFields, sanitizeString). `keys`: whether a field name is sensitive. `fields`: a flat field map before and after redaction (every value of a sensitive key becomes [REDACTED], whatever its type; the TypeScript SDK also recurses into nested objects, which the flat backends never receive, and tests that separately). `strings`: SanitizeString removes Unicode Cc characters, then truncates to 256 UTF-8 bytes at a character boundary. `expectedSdk`, when present, is the TypeScript SDK's result where it is deliberately stricter: it also removes U+2028 and U+2029 (design doc /core). Go cannot run this file until gincommon exports its sanitizer (design doc D6 I).",
+  "keys": [
+    {
+      "key": "authorization",
+      "sensitive": true
+    },
+    {
+      "key": "cookie",
+      "sensitive": true
+    },
+    {
+      "key": "password",
+      "sensitive": true
+    },
+    {
+      "key": "secret",
+      "sensitive": true
+    },
+    {
+      "key": "token",
+      "sensitive": true
+    },
+    {
+      "key": "access_token",
+      "sensitive": true
+    },
+    {
+      "key": "refresh_token",
+      "sensitive": true
+    },
+    {
+      "key": "id_token",
+      "sensitive": true
+    },
+    {
+      "key": "api_key",
+      "sensitive": true
+    },
+    {
+      "key": "set-cookie",
+      "sensitive": true
+    },
+    {
+      "key": "x-api-key",
+      "sensitive": true
+    },
+    {
+      "key": "x-auth-token",
+      "sensitive": true
+    },
+    {
+      "key": "credential",
+      "sensitive": true
+    },
+    {
+      "key": "private_key",
+      "sensitive": true
+    },
+    {
+      "key": "jwt",
+      "sensitive": true
+    },
+    {
+      "key": "bearer",
+      "sensitive": true
+    },
+    {
+      "key": "session",
+      "sensitive": true
+    },
+    {
+      "key": "session_id",
+      "sensitive": true
+    },
+    {
+      "key": "cert",
+      "sensitive": true
+    },
+    {
+      "key": "Authorization",
+      "sensitive": true
+    },
+    {
+      "key": "  PASSWORD  ",
+      "sensitive": true
+    },
+    {
+      "key": "X-Api-Key",
+      "sensitive": true
+    },
+    {
+      "key": "user_password",
+      "sensitive": true
+    },
+    {
+      "key": "passwordHash",
+      "sensitive": true
+    },
+    {
+      "key": "client_secret_v2",
+      "sensitive": true
+    },
+    {
+      "key": "csrf_token",
+      "sensitive": true
+    },
+    {
+      "key": "tokens",
+      "sensitive": true
+    },
+    {
+      "key": "credentials",
+      "sensitive": true
+    },
+    {
+      "key": "session_count",
+      "sensitive": true
+    },
+    {
+      "key": "bearer_scheme",
+      "sensitive": true
+    },
+    {
+      "key": "key",
+      "sensitive": true
+    },
+    {
+      "key": "signing_key",
+      "sensitive": true
+    },
+    {
+      "key": "hmac_key",
+      "sensitive": true
+    },
+    {
+      "key": "KEY",
+      "sensitive": true
+    },
+    {
+      "key": "enc_key ",
+      "sensitive": true
+    },
+    {
+      "key": "monkey",
+      "sensitive": false
+    },
+    {
+      "key": "hockey",
+      "sensitive": false
+    },
+    {
+      "key": "key_metrics",
+      "sensitive": false
+    },
+    {
+      "key": "keys",
+      "sensitive": false
+    },
+    {
+      "key": "api-key",
+      "sensitive": false
+    },
+    {
+      "key": "apikey",
+      "sensitive": false
+    },
+    {
+      "key": "cookies",
+      "sensitive": false
+    },
+    {
+      "key": "certificate",
+      "sensitive": false
+    },
+    {
+      "key": "jwt_header",
+      "sensitive": false
+    },
+    {
+      "key": "authorization_header",
+      "sensitive": false
+    },
+    {
+      "key": "trace_id",
+      "sensitive": false
+    },
+    {
+      "key": "request_id",
+      "sensitive": false
+    },
+    {
+      "key": "user",
+      "sensitive": false
+    },
+    {
+      "key": "route",
+      "sensitive": false
+    },
+    {
+      "key": "",
+      "sensitive": false
+    },
+    {
+      "key": "   ",
+      "sensitive": false
+    }
+  ],
+  "fields": [
+    {
+      "name": "mixed flat map",
+      "input": {
+        "user": "alice",
+        "password": "p@ss",
+        "Authorization": "Bearer abc",
+        "count": 3,
+        "api_key": 12345,
+        "route": "/x"
+      },
+      "expected": {
+        "user": "alice",
+        "password": "[REDACTED]",
+        "Authorization": "[REDACTED]",
+        "count": 3,
+        "api_key": "[REDACTED]",
+        "route": "/x"
+      }
+    },
+    {
+      "name": "non-string values of sensitive keys",
+      "input": {
+        "session": {
+          "id": "s1"
+        },
+        "token": null,
+        "secret": true,
+        "ok": false
+      },
+      "expected": {
+        "session": "[REDACTED]",
+        "token": "[REDACTED]",
+        "secret": "[REDACTED]",
+        "ok": false
+      }
+    },
+    {
+      "name": "nothing sensitive",
+      "input": {
+        "method": "GET",
+        "status": 200
+      },
+      "expected": {
+        "method": "GET",
+        "status": 200
+      }
+    },
+    {
+      "name": "empty map",
+      "input": {},
+      "expected": {}
+    }
+  ],
+  "strings": [
+    {
+      "name": "plain text unchanged",
+      "input": "hello world",
+      "expected": "hello world"
+    },
+    {
+      "name": "NUL removed",
+      "input": "a\u0000b",
+      "expected": "ab"
+    },
+    {
+      "name": "newline and carriage return removed",
+      "input": "line1\r\nline2",
+      "expected": "line1line2"
+    },
+    {
+      "name": "tab removed",
+      "input": "a\tb",
+      "expected": "ab"
+    },
+    {
+      "name": "DEL removed",
+      "input": "a\u007fb",
+      "expected": "ab"
+    },
+    {
+      "name": "C1 control NEL removed",
+      "input": "a\u0085b",
+      "expected": "ab"
+    },
+    {
+      "name": "C1 control CSI removed",
+      "input": "a\u009bb",
+      "expected": "ab"
+    },
+    {
+      "name": "zero-width space kept (format, not control)",
+      "input": "a\u200bb",
+      "expected": "a\u200bb"
+    },
+    {
+      "name": "non-ASCII letters kept",
+      "input": "caf\u00e9 \u00f1 \u65e5\u672c \u0645\u0631\u062d\u0628\u0627",
+      "expected": "caf\u00e9 \u00f1 \u65e5\u672c \u0645\u0631\u062d\u0628\u0627"
+    },
+    {
+      "name": "emoji kept",
+      "input": "ok \ud83d\udc4d",
+      "expected": "ok \ud83d\udc4d"
+    },
+    {
+      "name": "line separator: kept by the backends, removed by the SDK",
+      "input": "a\u2028b",
+      "expected": "a\u2028b",
+      "expectedSdk": "ab"
+    },
+    {
+      "name": "paragraph separator: kept by the backends, removed by the SDK",
+      "input": "a\u2029b",
+      "expected": "a\u2029b",
+      "expectedSdk": "ab"
+    },
+    {
+      "name": "empty string",
+      "input": "",
+      "expected": ""
+    },
+    {
+      "name": "exactly 256 bytes unchanged",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "257 ASCII bytes truncated to 256",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "long ASCII truncated to 256",
+      "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "name": "2-byte character straddling the limit dropped",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u00e9",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "3-byte character straddling the limit dropped",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u20ac",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "4-byte character straddling the limit dropped",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud83d\udc4d",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "2-byte character ending exactly at the limit kept",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u00e9",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u00e9"
+    },
+    {
+      "name": "controls removed before measuring",
+      "input": "\n\n\n\n\n\n\n\n\n\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "multibyte text truncated at a character boundary",
+      "input": "\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5",
+      "expected": "\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5\u65e5"
+    },
+    {
+      "name": "SDK removes separators before measuring",
+      "input": "\u2028\u2028aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "\u2028\u2028aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expectedSdk": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}
