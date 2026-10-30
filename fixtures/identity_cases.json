@@ -1,0 +1,439 @@
+{
+  "_comment": "Identity validation vectors (service, domain, environment, build version) shared by the Go, Python and TypeScript platform libraries. Rules: domain and service are matched exactly (no trimming or case folding) against the registry domain vocabulary and service pattern; environment is trimmed and lower-cased, then must be in the registry environment vocabulary (no aliases: 'production' is rejected); version is trimmed, an empty or absent version becomes 'unknown', and the result must match the registry version pattern (a non-matching version is an error, never rewritten). Each invalid case has exactly one invalid field, named in `error` (service | domain | environment | version). Go: go-probe identity-check (obsregistry CheckIdentity + CheckVersion). TypeScript: @platform/frontend-sdk/core initializeCore. Uses only domains present in every registry copy.",
+  "cases": [
+    {
+      "name": "all valid",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      }
+    },
+    {
+      "name": "environment trimmed and lower-cased",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "  PROD ",
+        "version": "1.2.3"
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "prod",
+        "version": "1.2.3"
+      }
+    },
+    {
+      "name": "environment mixed case",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "Staging",
+        "version": "1.2.3"
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "staging",
+        "version": "1.2.3"
+      }
+    },
+    {
+      "name": "every environment: local",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "local",
+        "version": "1.2.3"
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "local",
+        "version": "1.2.3"
+      }
+    },
+    {
+      "name": "every environment: test",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "test",
+        "version": "1.2.3"
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "test",
+        "version": "1.2.3"
+      }
+    },
+    {
+      "name": "version absent becomes unknown",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev"
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "unknown"
+      }
+    },
+    {
+      "name": "version empty becomes unknown",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": ""
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "unknown"
+      }
+    },
+    {
+      "name": "version blank becomes unknown",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "   "
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "unknown"
+      }
+    },
+    {
+      "name": "version trimmed",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": " 2.0.0 "
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "2.0.0"
+      }
+    },
+    {
+      "name": "version with build metadata",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.0.0+build.5"
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.0.0+build.5"
+      }
+    },
+    {
+      "name": "version with v prefix and pre-release",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "v1.2.3-rc.1"
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "v1.2.3-rc.1"
+      }
+    },
+    {
+      "name": "version git sha",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "f786d6b7be75"
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "f786d6b7be75"
+      }
+    },
+    {
+      "name": "version at 64 characters",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "name": "service with underscore",
+      "input": {
+        "service": "web_app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "identity": {
+        "service": "web_app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      }
+    },
+    {
+      "name": "service single letter",
+      "input": {
+        "service": "a",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "identity": {
+        "service": "a",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      }
+    },
+    {
+      "name": "service at 63 characters",
+      "input": {
+        "service": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "identity": {
+        "service": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      }
+    },
+    {
+      "name": "domain iam",
+      "input": {
+        "service": "web-app",
+        "domain": "iam",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "identity": {
+        "service": "web-app",
+        "domain": "iam",
+        "environment": "dev",
+        "version": "1.2.3"
+      }
+    },
+    {
+      "name": "domain not in vocabulary",
+      "input": {
+        "service": "web-app",
+        "domain": "unknown_domain",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "error": "domain"
+    },
+    {
+      "name": "domain is case-sensitive",
+      "input": {
+        "service": "web-app",
+        "domain": "Tender_Management",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "error": "domain"
+    },
+    {
+      "name": "domain is not trimmed",
+      "input": {
+        "service": "web-app",
+        "domain": " iam",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "error": "domain"
+    },
+    {
+      "name": "domain empty",
+      "input": {
+        "service": "web-app",
+        "domain": "",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "error": "domain"
+    },
+    {
+      "name": "service upper case",
+      "input": {
+        "service": "Web-App",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "error": "service"
+    },
+    {
+      "name": "service starts with a digit",
+      "input": {
+        "service": "1app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "error": "service"
+    },
+    {
+      "name": "service starts with a hyphen",
+      "input": {
+        "service": "-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "error": "service"
+    },
+    {
+      "name": "service empty",
+      "input": {
+        "service": "",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "error": "service"
+    },
+    {
+      "name": "service is not trimmed",
+      "input": {
+        "service": " web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "error": "service"
+    },
+    {
+      "name": "service with a dot",
+      "input": {
+        "service": "web.app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "error": "service"
+    },
+    {
+      "name": "service at 64 characters",
+      "input": {
+        "service": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.2.3"
+      },
+      "error": "service"
+    },
+    {
+      "name": "environment production has no alias",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "production",
+        "version": "1.2.3"
+      },
+      "error": "environment"
+    },
+    {
+      "name": "environment empty",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "",
+        "version": "1.2.3"
+      },
+      "error": "environment"
+    },
+    {
+      "name": "environment unknown",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "qa",
+        "version": "1.2.3"
+      },
+      "error": "environment"
+    },
+    {
+      "name": "version starts with a hyphen",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "-1.0"
+      },
+      "error": "version"
+    },
+    {
+      "name": "version with a slash",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1.0/2"
+      },
+      "error": "version"
+    },
+    {
+      "name": "version with an inner space",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1 2"
+      },
+      "error": "version"
+    },
+    {
+      "name": "version at 65 characters",
+      "input": {
+        "service": "web-app",
+        "domain": "tender_management",
+        "environment": "dev",
+        "version": "1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "error": "version"
+    }
+  ]
+}

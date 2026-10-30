@@ -8,7 +8,7 @@ def main() -> int:
         print(
             "usage: python -m probe "
             "<gucset-check|hmac-check|hmac-sign|envelope-check|metrics-check|header-check|"
-            "pg-rls-check|pg-migrate|pg-migrate-check|pg-metrics-check|http-serve|events-publish|"
+            "pg-rls-check|pg-migrate|pg-migrate-check|pg-metrics-check|http-serve|problem-bodies|events-publish|"
             "events-consume|events-topology|events-send-raw|events-outbox-enqueue|events-outbox-run> [args...]",
             file=sys.stderr,
         )
@@ -33,6 +33,8 @@ def main() -> int:
         from probe.metrics_check import run
     elif subcommand == "header-check":
         from probe.header_check import run
+    elif subcommand == "problem-bodies":
+        from probe.problem_bodies import run
     elif subcommand == "pg-rls-check":
         from probe.pgrls_check import run
     elif subcommand == "pg-migrate":

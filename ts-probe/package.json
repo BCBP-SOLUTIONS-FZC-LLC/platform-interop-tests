@@ -1,0 +1,6 @@
+{
+  "name": "ts-probe",
+  "private": true,
+  "type": "module",
+  "description": "Pair 4: the frontend SDK (platform-reactcommon) against the live http-serve servers. Run with the SDK checkout's tsx; it has no dependencies of its own."
+}

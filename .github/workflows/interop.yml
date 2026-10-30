@@ -1,6 +1,6 @@
 # Reusable workflow — called by each of the six libraries' own CI (see COMPATIBILITY.md for the
 # calling snippet) on every PR, plus a nightly schedule against every repo's default branch as a
-# safety net. Checks out all seven repos as siblings (see README.md for the exact layout) and
+# safety net. Checks out all eight repos as siblings (the frontend SDK under react/) (see README.md for the exact layout) and
 # runs run_interop.sh. A caller in the middle of its own PR passes its own ref via the matching
 # `*_ref` input so the interop check runs against the PR's actual changes, not stale `main`.
 name: Interop
@@ -24,6 +24,9 @@ name: Interop
         type: string
         default: main
       platform_pgcommon_py_ref:
+        type: string
+        default: main
+      platform_reactcommon_ref:
         type: string
         default: main
     secrets:
@@ -54,6 +57,9 @@ name: Interop
         type: string
         default: main
       platform_pgcommon_py_ref:
+        type: string
+        default: main
+      platform_reactcommon_ref:
         type: string
         default: main
   schedule:
@@ -134,6 +140,26 @@ jobs:
           token: ${{ secrets.gh_private_token }}
           path: python/platform-pgcommon-py
           persist-credentials: false
+
+      # Pair 4: the frontend SDK, run by ts-probe against the live http-serve servers. It sits
+      # where the local workspace has it (react/platform-reactcommon) and needs its node_modules.
+      - name: Checkout platform-reactcommon
+        uses: actions/checkout@v7
+        with:
+          repository: BCBP-SOLUTIONS-FZC-LLC/platform-reactcommon
+          ref: ${{ inputs.platform_reactcommon_ref || 'main' }}
+          token: ${{ secrets.gh_private_token }}
+          path: react/platform-reactcommon
+          persist-credentials: false
+
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: react/platform-reactcommon/.nvmrc
+
+      - name: Install the frontend SDK's dependencies
+        working-directory: react/platform-reactcommon
+        run: corepack enable && pnpm install --frozen-lockfile
 
       - name: Install Go
         uses: actions/setup-go@v6

@@ -364,6 +364,19 @@ python3 "$ROOT/compare.py" trace_continuity "$ROOT/.build/go_call_other.json" "$
   && pass "trace continuity: own_trace_id == peer's reported trace_id, both directions" \
   || fail "trace continuity: trace ID did not propagate correctly in one direction"
 
+# --- pair 4: the frontend SDK against both live servers ---
+echo "== pair 4: frontend SDK ts-probe (problem-decode, propagation, cross-origin) =="
+SDK_DIR="${INTEROP_SDK_DIR:-$ROOT/../react/platform-reactcommon}"
+TSX="$SDK_DIR/node_modules/.bin/tsx"
+if [ -x "$TSX" ]; then
+  "$TSX" "$ROOT/ts-probe/main.ts" --go "http://localhost:$GO_HTTP_PORT" --py "http://localhost:$PY_HTTP_PORT" --sdk "$SDK_DIR" \
+    > "$ROOT/.build/ts_probe.json" 2>"$ROOT/.build/ts_probe.err" \
+    && pass "ts-probe: the SDK parses both servers' problems identically; propagation and cross-origin rules hold" \
+    || fail "ts-probe: a check failed (see .build/ts_probe.json and ts_probe.err)"
+else
+  fail "ts-probe: no frontend SDK with node_modules at $SDK_DIR (run pnpm install there, or set INTEROP_SDK_DIR)"
+fi
+
 kill_tree "$GO_SERVER_PID"
 kill_tree "$PY_SERVER_PID"
 GO_SERVER_PID=""

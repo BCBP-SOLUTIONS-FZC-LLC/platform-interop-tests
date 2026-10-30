@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 
 from fastapicommon.auth import CurrentUser, require_authenticated_user
 from fastapicommon.bootstrap import create_platform_app
@@ -78,7 +78,32 @@ def build_app() -> FastAPI:
             "peer_status": resp.status_code,
         }
 
+    # For the frontend SDK's ts-probe (pair 4): the problem scenarios of problem-bodies under
+    # /errors, and an unprotected /echo reporting the correlation and identity headers received.
+    from probe import problem_bodies
+
+    app.mount("/errors", problem_bodies.build_app())
+
+    @app.get("/echo")
+    async def echo(request: Request) -> dict[str, object]:
+        traceparent = request.headers.get("traceparent", "")
+        parts = traceparent.split("-")
+        trace_id = parts[1] if len(parts) == 4 and len(parts[1]) == 32 and parts[1] != "0" * 32 else ""
+        return {
+            "language": "python",
+            "traceparent": traceparent,
+            "received_trace_id": trace_id,
+            "x_request_id": request.headers.get("x-request-id", ""),
+            "x_session_id": request.headers.get("x-session-id", ""),
+            "authorization": "authorization" in request.headers,
+            "identity_headers": [h for h in IDENTITY_HEADERS if h in request.headers],
+        }
+
     return app
+
+
+# Headers only the gateway may set (gincommon's three plus IAM's ingress strip-list).
+IDENTITY_HEADERS = ("x-user-id", "x-tenant-id", "x-tenant-roles", "x-departments", "x-plan", "x-feature-flags", "x-residency-mode")
 
 
 def run(args: list[str]) -> int:
