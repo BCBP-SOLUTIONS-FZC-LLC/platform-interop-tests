@@ -71,11 +71,13 @@ func problemRequestHeaders(name string) map[string]string {
 	}
 }
 
-// problemEngine is a gincommon service with one route per scenario.
-func problemEngine() *gin.Engine {
+// problemEngine is a gincommon service with one route per scenario. cfg is the process's
+// gincommon config (metrics are initialised once per identity); a 50 ms RequestTimeout is added
+// for the server-timeout scenario. http-serve also mounts it under /errors.
+func problemEngine(cfg gincommon.Config) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	cfg := gincommon.Config{ServiceName: "go-probe", Domain: "documents", Environment: "test", RequestTimeout: 50 * time.Millisecond}
+	cfg.RequestTimeout = 50 * time.Millisecond
 	r.Use(gincommon.ObservabilityMiddlewares(cfg)...)
 
 	r.GET("/validation", func(c *gin.Context) {
@@ -113,7 +115,7 @@ func problemEngine() *gin.Engine {
 }
 
 func captureGoProblems() ([]capturedProblem, error) {
-	engine := problemEngine()
+	engine := problemEngine(gincommon.Config{ServiceName: "go-probe", Domain: "documents", Environment: "test"})
 	out := make([]capturedProblem, 0, len(problemScenarios))
 	for _, s := range problemScenarios {
 		req := httptest.NewRequest(http.MethodGet, s.Path, nil)

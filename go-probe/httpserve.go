@@ -37,6 +37,11 @@ func runHTTPServe(args []string) error {
 
 	r.GET("/health", gincommon.HealthHandler())
 
+	// For the frontend SDK's ts-probe (pair 4): the problem scenarios of problem-bodies under
+	// /errors, and an unprotected /echo reporting the correlation and identity headers received.
+	r.Any("/errors/*path", gin.WrapH(http.StripPrefix("/errors", problemEngine(cfg))))
+	r.GET("/echo", echoHeaders)
+
 	protected := r.Group("/")
 	protected.Use(gincommon.ProtectedMiddlewares(cfg)...)
 
@@ -121,4 +126,28 @@ func runHTTPServe(args []string) error {
 
 	fmt.Fprintf(os.Stderr, "go-probe http-serve listening on :%s (peer=%q)\n", *port, *peer)
 	return r.Run(":" + *port)
+}
+
+// identityHeaders are the headers only the gateway may set (gincommon's three plus IAM's
+// ingress strip-list); /echo reports any that reached the service.
+var identityHeaders = []string{"x-user-id", "x-tenant-id", "x-tenant-roles", "x-departments", "x-plan", "x-feature-flags", "x-residency-mode"}
+
+// echoHeaders reports what the caller sent: the traceparent's trace id, x-request-id,
+// x-session-id, whether an Authorization header came, and any identity header that arrived.
+func echoHeaders(c *gin.Context) {
+	present := []string{}
+	for _, h := range identityHeaders {
+		if c.GetHeader(h) != "" {
+			present = append(present, h)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"language":          "go",
+		"traceparent":       c.GetHeader("traceparent"),
+		"received_trace_id": problem.TraceIDFromTraceparent(c.GetHeader("traceparent")),
+		"x_request_id":      c.GetHeader("x-request-id"),
+		"x_session_id":      c.GetHeader("x-session-id"),
+		"authorization":     c.GetHeader("Authorization") != "",
+		"identity_headers":  present,
+	})
 }
