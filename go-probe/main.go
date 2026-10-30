@@ -11,12 +11,14 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: go-probe <gucset-check|hmac-check|hmac-verify|envelope-check|metrics-check|pg-rls-check|pg-migrate|pg-metrics-check|http-serve|events-publish|events-consume|events-outbox-enqueue|events-outbox-run> [args...]")
+		fmt.Fprintln(os.Stderr, "usage: go-probe <contracts-export|gucset-check|hmac-check|hmac-verify|envelope-check|metrics-check|pg-rls-check|pg-migrate|pg-metrics-check|http-serve|events-publish|events-consume|events-outbox-enqueue|events-outbox-run> [args...]")
 		os.Exit(2)
 	}
 
 	var err error
 	switch os.Args[1] {
+	case "contracts-export":
+		err = runContractsExport(os.Args[2:])
 	case "gucset-check":
 		err = runGUCSetCheck(os.Args[2:])
 	case "hmac-check":
