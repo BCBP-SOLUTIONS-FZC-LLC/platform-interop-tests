@@ -83,12 +83,20 @@ PY_RUN=(uv run --project "$PY_PROBE_DIR" python -m probe)
 echo "== Bringing up Postgres + floci =="
 (cd "$ROOT" && docker compose up -d) || { echo "docker compose up failed"; exit 1; }
 COMPOSE_STARTED=1
+# Over TCP, not the Unix socket: the image's entrypoint first runs a temporary server for the init
+# scripts, on the socket only, then restarts. A socket check passes on that temporary server, and the
+# first connection then hits the restart ("connection reset by peer", CI run 45454691608).
 echo -n "waiting for postgres..."
+pg_ready=0
 for _ in $(seq 1 60); do
-  (cd "$ROOT" && docker compose exec -T postgres pg_isready -U postgres -d interop) >/dev/null 2>&1 && break
+  if (cd "$ROOT" && docker compose exec -T postgres pg_isready -h 127.0.0.1 -U postgres -d interop) >/dev/null 2>&1; then
+    pg_ready=1
+    break
+  fi
   echo -n "."
   sleep 1
 done
+[ "$pg_ready" = 1 ] || { echo " not ready after 60 s"; exit 1; }
 echo " ready"
 
 DSN="postgres://interop_app:interop_app@localhost:${PG_PORT}/interop"
