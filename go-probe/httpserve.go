@@ -129,8 +129,9 @@ func runHTTPServe(args []string) error {
 }
 
 // identityHeaders are the headers only the gateway may set (gincommon's three plus IAM's
-// ingress strip-list); /echo reports any that reached the service.
-var identityHeaders = []string{"x-user-id", "x-tenant-id", "x-tenant-roles", "x-departments", "x-plan", "x-feature-flags", "x-residency-mode"}
+// ingress strip-list, with x-auth-time: AuthZ Enrichment injects it when the token has auth_time,
+// AE-49); /echo reports any that reached the service.
+var identityHeaders = []string{"x-user-id", "x-tenant-id", "x-tenant-roles", "x-departments", "x-plan", "x-feature-flags", "x-residency-mode", "x-auth-time"}
 
 // echoHeaders reports what the caller sent: the traceparent's trace id, x-request-id,
 // x-session-id, whether an Authorization header came, and any identity header that arrived.

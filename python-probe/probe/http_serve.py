@@ -103,7 +103,7 @@ def build_app() -> FastAPI:
 
 
 # Headers only the gateway may set (gincommon's three plus IAM's ingress strip-list).
-IDENTITY_HEADERS = ("x-user-id", "x-tenant-id", "x-tenant-roles", "x-departments", "x-plan", "x-feature-flags", "x-residency-mode")
+IDENTITY_HEADERS = ("x-user-id", "x-tenant-id", "x-tenant-roles", "x-departments", "x-plan", "x-feature-flags", "x-residency-mode", "x-auth-time")
 
 
 def run(args: list[str]) -> int:
