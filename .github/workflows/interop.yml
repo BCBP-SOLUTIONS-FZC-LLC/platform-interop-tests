@@ -32,13 +32,17 @@ name: Interop
     secrets:
       gh_private_token:
         description: >-
-          A PAT (or org-wide equivalent) with Contents:Read on all six libraries. Already used
-          under the name GH_PRIVATE_TOKEN by the three Python repos' own CI for sibling
-          checkouts; the three Go repos currently only define GO_PRIVATE_TOKEN (used for a
-          different purpose — git-credential-helper auth for `go mod download`, not
-          actions/checkout). Confirm GH_PRIVATE_TOKEN is also available to the Go repos (as a
-          repo or org secret) before this workflow can succeed when called from them.
+          A token with Contents:Read on all seven library repos. Callers pass the org secret
+          GO_PRIVATE_TOKEN (platform-events, platform-reactcommon and platform-fastapicommon do).
+          The nightly schedule and workflow_dispatch runs have no caller, so `secrets.gh_private_token`
+          there means a GH_PRIVATE_TOKEN secret, which the org does not define; every token use
+          below therefore falls back to the org secret GO_PRIVATE_TOKEN, which those runs see.
         required: true
+      GO_PRIVATE_TOKEN:
+        description: >-
+          Not passed by callers. Declared only so the fallback above is a known secret; on the
+          nightly schedule and workflow_dispatch it resolves to the org secret of that name.
+        required: false
   workflow_dispatch:
     inputs:
       platform_events_ref:
@@ -92,7 +96,7 @@ jobs:
         with:
           repository: BCBP-SOLUTIONS-FZC-LLC/platform-events
           ref: ${{ inputs.platform_events_ref || 'main' }}
-          token: ${{ secrets.gh_private_token }}
+          token: ${{ secrets.gh_private_token || secrets.GO_PRIVATE_TOKEN }}
           path: platform-events
           persist-credentials: false
 
@@ -101,7 +105,7 @@ jobs:
         with:
           repository: BCBP-SOLUTIONS-FZC-LLC/platform-gincommon
           ref: ${{ inputs.platform_gincommon_ref || 'main' }}
-          token: ${{ secrets.gh_private_token }}
+          token: ${{ secrets.gh_private_token || secrets.GO_PRIVATE_TOKEN }}
           path: platform-gincommon
           persist-credentials: false
 
@@ -110,7 +114,7 @@ jobs:
         with:
           repository: BCBP-SOLUTIONS-FZC-LLC/platform-pgcommon
           ref: ${{ inputs.platform_pgcommon_ref || 'main' }}
-          token: ${{ secrets.gh_private_token }}
+          token: ${{ secrets.gh_private_token || secrets.GO_PRIVATE_TOKEN }}
           path: platform-pgcommon
           persist-credentials: false
 
@@ -119,7 +123,7 @@ jobs:
         with:
           repository: BCBP-SOLUTIONS-FZC-LLC/platform-eventcommon
           ref: ${{ inputs.platform_eventcommon_ref || 'main' }}
-          token: ${{ secrets.gh_private_token }}
+          token: ${{ secrets.gh_private_token || secrets.GO_PRIVATE_TOKEN }}
           path: python/platform-eventcommon
           persist-credentials: false
 
@@ -128,7 +132,7 @@ jobs:
         with:
           repository: BCBP-SOLUTIONS-FZC-LLC/platform-fastapicommon
           ref: ${{ inputs.platform_fastapicommon_ref || 'main' }}
-          token: ${{ secrets.gh_private_token }}
+          token: ${{ secrets.gh_private_token || secrets.GO_PRIVATE_TOKEN }}
           path: python/platform-fastapicommon
           persist-credentials: false
 
@@ -137,7 +141,7 @@ jobs:
         with:
           repository: BCBP-SOLUTIONS-FZC-LLC/platform-pgcommon-py
           ref: ${{ inputs.platform_pgcommon_py_ref || 'main' }}
-          token: ${{ secrets.gh_private_token }}
+          token: ${{ secrets.gh_private_token || secrets.GO_PRIVATE_TOKEN }}
           path: python/platform-pgcommon-py
           persist-credentials: false
 
@@ -148,7 +152,7 @@ jobs:
         with:
           repository: BCBP-SOLUTIONS-FZC-LLC/platform-reactcommon
           ref: ${{ inputs.platform_reactcommon_ref || 'main' }}
-          token: ${{ secrets.gh_private_token }}
+          token: ${{ secrets.gh_private_token || secrets.GO_PRIVATE_TOKEN }}
           path: react/platform-reactcommon
           persist-credentials: false
 
@@ -183,7 +187,7 @@ jobs:
           GOPRIVATE: github.com/BCBP-SOLUTIONS-FZC-LLC/*
           GIT_TERMINAL_PROMPT: "0"
           GIT_CONFIG_COUNT: "1"
-          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ secrets.gh_private_token }}@github.com/BCBP-SOLUTIONS-FZC-LLC/.insteadOf
+          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ secrets.gh_private_token || secrets.GO_PRIVATE_TOKEN }}@github.com/BCBP-SOLUTIONS-FZC-LLC/.insteadOf
           GIT_CONFIG_VALUE_0: https://github.com/BCBP-SOLUTIONS-FZC-LLC/
         run: ./run_interop.sh
 
